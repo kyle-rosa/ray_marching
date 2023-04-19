@@ -1,7 +1,6 @@
 import itertools
 
 import torch
-import torch.nn.functional as F
 
 from control import GameLoop, user_input_generator, user_input_mapper
 from rendering.display import make_display_manager
@@ -14,7 +13,7 @@ if __name__=='__main__':
     dtype = torch.float32
 
     game_loop = GameLoop().to(device)
-    game_loop = torch.compile(game_loop)
+    # game_loop = torch.compile(game_loop, mode="max-autotune")
 
     user_input = user_input_generator(dtype, device)
     input_mapper = user_input_mapper(dtype, device)
@@ -30,9 +29,6 @@ if __name__=='__main__':
     mode = next(modes_cycle)
     degree = torch.tensor(1).to(dtype=dtype, device=device)
     mode_index = {v: k for (k, v) in enumerate(modes)}
-
-    orientations = F.normalize(torch.randn((1, 1, 1, 4)), p=2, dim=-1, eps=0).to(device)
-    translations = torch.randn((1, 1, 1, 3)).to(device)
 
     while True:
         (ndc_mouse_offset, key) = user_input.send(None)

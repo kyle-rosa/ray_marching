@@ -1,8 +1,11 @@
-import torch
 import cv2
+import torch
+from torch import Tensor
 
 
-def to_numpy_byte_image(tensor_image):
+def to_numpy_byte_image(
+    tensor_image: Tensor
+):
     return (
         tensor_image
         .multiply(256).floor().clamp(0, 255).to(torch.uint8)
@@ -10,7 +13,10 @@ def to_numpy_byte_image(tensor_image):
     )
 
 
-def make_display_manager(window_width, window_height):
+def make_display_manager(
+    window_width: int,
+    window_height: int
+):
     window = 'render'
     writers = {}
     cv2.startWindowThread()

@@ -126,7 +126,7 @@ class TangentShader(torch.nn.Module):
 
 
 def spin_shader(camera_orientation_conj, surface_normals, cyclic_colourmap, degree):
-    value = Q.multiplication(
+    value = Q.multiply(
         F.pad(surface_normals, [1, 0], value=0.),
         camera_orientation_conj,
     )
@@ -147,7 +147,7 @@ class SpinShader(nn.Module):
 class Shader(nn.Module):
     def __init__(
         self,
-        cyclic_cmap: Tensor = torch.load(Path() / 'data/brightness_normalised_romaO.pt'),
+        cyclic_cmap: Tensor = torch.load(Path() / 'data/cyclic_cmap.pt'),
         decay_factor: float = 0.01
     ):
         super().__init__()
