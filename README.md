@@ -1,3 +1,2 @@
-# ray_marching
+# Ray Marching
 
-test

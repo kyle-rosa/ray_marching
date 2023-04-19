@@ -171,7 +171,6 @@ class Shader(nn.Module):
     ):
         self.cyclic_cmap = self.cyclic_cmap.roll(65, -2)
         camera_orientation_conj = Q.conjugate(camera_orientation)[..., None, None, :]
-
         lambertian_layer = self.lambertian_shader(
             ray_directions,
             surface_normals

@@ -5,6 +5,7 @@ import torch
 from control import GameLoop, user_input_generator, user_input_mapper
 from rendering.display import make_display_manager
 
+
 torch.set_float32_matmul_precision(precision='high')
 
 
@@ -12,22 +13,34 @@ if __name__=='__main__':
     device = torch.device('cuda')
     dtype = torch.float32
 
-    game_loop = GameLoop().to(device)
-    # game_loop = torch.compile(game_loop, mode="max-autotune")
+    torch.set_default_dtype(dtype)
 
-    user_input = user_input_generator(dtype, device)
-    input_mapper = user_input_mapper(dtype, device)
-    display_manager = make_display_manager(800, 800)
+    game_loop = GameLoop(
+        num_cameras=1,
+        px_width=800,
+        px_height=800,
+        focal_length=17e-3,
+        sensor_width=17e-3,
+        sensor_height=17e-3,
+        marching_steps=32,
+    ).to(device)
+    game_loop = torch.compile(game_loop, mode='max-autotune')
+
+    user_input = user_input_generator(device)
+    input_mapper = user_input_mapper(device)
+    display_manager = make_display_manager(
+        window_width=800,
+        window_height=800
+    )
 
     user_input.send(None)
     input_mapper.send(None)
     display_manager.send(None)
 
-
     modes = ['lambertian', 'normal', 'tangent', 'spin']
     modes_cycle = itertools.cycle(modes)
     mode = next(modes_cycle)
-    degree = torch.tensor(1).to(dtype=dtype, device=device)
+    degree = torch.tensor(1).to(device=device)
     mode_index = {v: k for (k, v) in enumerate(modes)}
 
     while True:
