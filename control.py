@@ -38,7 +38,6 @@ def user_input_generator(
 
 
 def get_keybindings(
-    # dtype: torch.dtype = _default_dtype,
     device: torch.device = _default_device,
 ):
     keybindings = pd.read_csv(Path() / 'data/keybindings.csv', header=0)
@@ -52,7 +51,6 @@ def get_keybindings(
 
 
 def user_input_mapper(
-    # dtype: torch.dtype = _default_dtype,
     device: torch.device = _default_device
 ):
     keybindings = get_keybindings(device=device)
