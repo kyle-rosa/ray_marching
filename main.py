@@ -2,7 +2,7 @@ import itertools
 
 import torch
 
-from control import GameLoop, user_input_generator, user_input_mapper
+from control import RenderLoop, user_input_generator, user_input_mapper
 from rendering.display import make_display_manager
 
 
@@ -15,7 +15,7 @@ if __name__=='__main__':
 
     torch.set_default_dtype(dtype)
 
-    game_loop = GameLoop(
+    render_loop = RenderLoop(
         num_cameras=1,
         px_width=800,
         px_height=800,
@@ -24,7 +24,7 @@ if __name__=='__main__':
         sensor_height=17e-3,
         marching_steps=32,
     ).to(device)
-    game_loop = torch.compile(game_loop, mode='max-autotune')
+    render_loop = torch.compile(render_loop)#, mode='max-autotune')
 
     user_input = user_input_generator(device)
     input_mapper = user_input_mapper(device)
@@ -56,5 +56,5 @@ if __name__=='__main__':
             degree = degree.add(-1)
 
         (orientation_input, translation_input) = input_mapper.send((ndc_mouse_offset, key))
-        (baseline, images) = game_loop(orientation_input, translation_input, degree)
+        (baseline, images) = render_loop(orientation_input, translation_input, degree)
         display_manager.send(images[mode_index[mode]].mul(baseline))

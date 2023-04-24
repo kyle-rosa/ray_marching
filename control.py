@@ -89,7 +89,7 @@ class ConfigurationIntegrator(nn.Module):
         self,
         orientation_input: Tensor,
         translation_input: Tensor
-    ):
+    ) -> tuple[Tensor, Tensor]:
         self.position = Q.rotation(
             translation_input.div(10).expand_as(self.position),
             self.orientation
@@ -104,7 +104,7 @@ class ConfigurationIntegrator(nn.Module):
         return (self.orientation, self.position)
 
 
-class GameLoop(nn.Module):
+class RenderLoop(nn.Module):
     def __init__(
         self,
         num_cameras: int = 1,
