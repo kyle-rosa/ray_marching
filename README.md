@@ -1,9 +1,9 @@
 # Ray Marching
 <p align="center">
-  <img src="gallery/lambertian.png?raw=true" width="220"> 
-  <img src="gallery/normal.png?raw=true" width="220"> 
-  <img src="gallery/tangent.png?raw=true" width="220"> 
-  <img src="gallery/spin.png?raw=true" width="220">
+  <img src="gallery/lambertian.png?raw=true" width="200"> 
+  <img src="gallery/normal.png?raw=true" width="200"> 
+  <img src="gallery/tangent.png?raw=true" width="200"> 
+  <img src="gallery/spin.png?raw=true" width="200">
 </p>
 *Ray marching* is a method for rendering computer graphics. 
 Ray marching algorithms operate on a *signed distance field* (SDF) representation of the scene, instead of textured meshes. SDFs encode the distance between points in space and the surfaces of the various objects in the scene. This allows one to 
