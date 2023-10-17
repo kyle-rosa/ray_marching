@@ -98,7 +98,7 @@ class ConfigurationIntegrator(nn.Module):
             Q.multiply(
                 self.orientation,
                 Q.to_versor(orientation_input.div(10)).expand_as(self.orientation)
-            ), 
+            ),
             p=2, dim=-1, eps=0
         )
         return (self.orientation, self.position)

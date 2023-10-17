@@ -5,7 +5,7 @@ import torch.nn as nn
 class SDFSpheres(nn.Module):
     def __init__(self, radii):
         super().__init__()
-        self.register_buffer('radii',  torch.tensor(radii))
+        self.radii = nn.Parameter(torch.tensor(radii))
 
     def forward(self, query_positions):
         return (
@@ -18,7 +18,7 @@ class SDFSpheres(nn.Module):
 class SDFBoxes(nn.Module):
     def __init__(self, halfsides):
         super().__init__()
-        self.register_buffer('halfsides',  torch.tensor(halfsides))
+        self.halfsides = nn.Parameter(torch.tensor(halfsides))
 
     def forward(self, query_positions):
         q = query_positions.abs().sub(self.halfsides)
@@ -41,13 +41,12 @@ class SDFPlanes(nn.Module):
 class SDFLine(nn.Module):
     def __init__(self, starts, ends, radii):
         super().__init__()
-        self.register_buffer('starts', torch.tensor(starts))
-        self.register_buffer('ends', torch.tensor(ends))
-        self.register_buffer('radii', torch.tensor(radii))
-
-        self.register_buffer('AB', self.ends.sub(self.starts))
-        self.register_buffer('length2', self.AB.pow(2).sum(dim=-1, keepdim=True))
-        self.register_buffer('AB_div_length2', self.AB.div(self.length2))
+        self.starts = nn.Parameter(torch.tensor(starts))
+        self.ends = nn.Parameter(torch.tensor(ends))
+        self.radii = nn.Parameter(torch.tensor(radii))
+        self.AB = nn.Parameter(self.ends.sub(self.starts))
+        self.length2 = nn.Parameter(self.AB.pow(2).sum(dim=-1, keepdim=True))
+        self.AB_div_length2 = nn.Parameter(self.AB.div(self.length2))
 
     def forward(self, query_positions):
         AP = query_positions[..., None, :].sub(self.starts)
@@ -61,7 +60,7 @@ class SDFLine(nn.Module):
 class SDFDisks(nn.Module):
     def __init__(self, radii):
         super().__init__()
-        self.register_buffer('radii',  torch.tensor(radii))
+        self.radii = nn.Parameter(torch.tensor(radii))
 
     def forward(self, query_positions):
         r_dist = (
@@ -75,11 +74,11 @@ class SDFDisks(nn.Module):
         )
 
 
-class SDFTorii(nn.Module):
+class SDFTori(nn.Module):
     def __init__(self, radii1, radii2):
         super().__init__()
-        self.register_buffer('radii1',  torch.tensor(radii1))
-        self.register_buffer('radii2',  torch.tensor(radii2))
+        self.radii1 = nn.Parameter(torch.tensor(radii1))
+        self.radii2 = nn.Parameter(torch.tensor(radii2))
 
     def forward(self, query_positions):
         return torch.cat(

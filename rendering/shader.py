@@ -170,7 +170,9 @@ class Shader(nn.Module):
         degree: int,
     ):
         self.cyclic_cmap = self.cyclic_cmap.roll(65, -2)
-        camera_orientation_conj = Q.conjugate(camera_orientation)[..., None, None, :]
+        camera_orientation_conj = Q.conjugate(
+            camera_orientation
+        )[..., None, None, :]
         lambertian_layer = self.lambertian_shader(
             ray_directions,
             surface_normals
@@ -179,10 +181,10 @@ class Shader(nn.Module):
             surface_normals
         )
         tangent_layer = self.tangent_shader(
-            camera_orientation_conj, 
-            ray_directions, 
-            surface_normals, 
-            self.cyclic_cmap, 
+            camera_orientation_conj,
+            ray_directions,
+            surface_normals,
+            self.cyclic_cmap,
             degree
         )
         spin_layer = self.spin_shader(

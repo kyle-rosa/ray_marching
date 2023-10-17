@@ -1,4 +1,4 @@
-from .primitives import SDFSpheres, SDFBoxes, SDFPlanes, SDFLine, SDFDisks, SDFTorii
+from .primitives import SDFSpheres, SDFBoxes, SDFPlanes, SDFLine, SDFDisks, SDFTori
 from .transformations import SDFOnion, SDFRounding, SDFSmoothUnion, SDFUnion, SDFAffineTransformation
 
 
@@ -30,7 +30,7 @@ def make_test_scene():
                 SDFAffineTransformation(
                     orientation=[[0.0, 0.5**0.5, 0.5**0.5, 0.0]],
                     translation=[[0.0, 0.5, 1.0]],
-                    sdf=SDFTorii(
+                    sdf=SDFTori(
                         radii1=[[0.5,]], 
                         radii2=[[0.1,]]
                     ),
@@ -38,3 +38,4 @@ def make_test_scene():
             ], 
             blend_k=22.0,
         )
+

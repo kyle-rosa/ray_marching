@@ -24,7 +24,8 @@ if __name__=='__main__':
         sensor_height=17e-3,
         marching_steps=32,
     ).to(device)
-    render_loop = torch.compile(render_loop)#, mode='max-autotune')
+    render_loop = torch.compile(render_loop)
+    # render_loop = torch.compile(render_loop, mode='max-autotune')
 
     user_input = user_input_generator(device)
     input_mapper = user_input_mapper(device)
@@ -43,7 +44,10 @@ if __name__=='__main__':
     degree = torch.tensor(1).to(device=device)
     mode_index = {v: k for (k, v) in enumerate(modes)}
 
+    # optimizer = torch.optim.AdamW(params=render_loop.parameters(), lr=0.01)
+
     while True:
+        # optimizer.zero_grad()
         (ndc_mouse_offset, key) = user_input.send(None)
 
         if key == ord("q"):
@@ -57,4 +61,9 @@ if __name__=='__main__':
 
         (orientation_input, translation_input) = input_mapper.send((ndc_mouse_offset, key))
         (baseline, images) = render_loop(orientation_input, translation_input, degree)
+
+        # loss = images[-1].var().sum()
+        # loss.backward()
+        # optimizer.step()
+
         display_manager.send(images[mode_index[mode]].mul(baseline))
