@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import cv2
 import pandas as pd
 import pyautogui
 import torch
@@ -12,13 +11,54 @@ import quaternion as Q
 from rendering.ray_marching import Marcher, PinholeCamera
 from rendering.shader import SDFNormals, Shader
 
+from pynput import mouse, keyboard
+from collections import defaultdict
+
 
 _default_device = torch.device('cpu')
 
 
+class EventAggregator():
+    def __init__(self):
+        self.mouse_state = (0, 0)
+        self.keyboard_state = defaultdict(bool)
+
+        def on_move(x, y):
+            self.mouse_state = (x, y)
+        
+        def on_click(x, y, button, pressed):
+            pass
+
+        def on_scroll(x, y, dx, dy):
+            pass
+
+        def on_press(key):
+            self.keyboard_state[key] = True
+
+        def on_release(key):
+            self.keyboard_state[key] = False
+        
+        listeners = {
+            'mouse': mouse.Listener(
+                on_move=on_move,
+                on_click=None,
+                on_scroll=None
+            ),
+            'keyboard':  keyboard.Listener(
+                on_press=on_press, 
+                on_release=on_release
+            )
+        }
+        for listener in listeners.values():
+            listener.start()
+
+    def get_state(self):
+        return self.mouse_state, self.keyboard_state
+
+
 def user_input_generator(
     device: torch.device = _default_device,
-    dtype=torch.float32
+    dtype: torch.dtype = torch.float32
 ):
     screen_size = (pyautogui.size().width//2, pyautogui.size().height)
     screen_centre = tuple(it//2 for it in screen_size)
@@ -28,22 +68,21 @@ def user_input_generator(
 
     pyautogui.moveTo(*screen_centre)
     ndc_mouse_offset = torch.zeros(2, device=device, dtype=dtype)
-    
-    while True: 
-        key = cv2.waitKey(1) & 0xFF
-        yield (ndc_mouse_offset, key)
 
-        pos = pyautogui.position()
-        ndc_mouse_offset = (
-            torch.tensor([pos.x, pos.y], device=device, dtype=dtype)
-            .sub(mu).div(sigma).clamp(-0.99, 0.99)
-        )
-        # pyautogui.moveTo(*screen_centre, _pause=False)
+    event_aggregator = EventAggregator()
+
+    while True: 
+        (mouse_state, keyboard_state) = event_aggregator.get_state()
+        mouse_state = torch.tensor([mouse_state[0],  mouse_state[1]], device=device, dtype=dtype)
+        ndc_mouse_offset = (mouse_state.sub(mu).div(sigma).clamp(-0.99, 0.99))
+        keys = [ord(k.char) for (k, v) in keyboard_state.items() if v]
+        key = (keys + [None])[0]
+        yield (ndc_mouse_offset, key)
 
 
 def get_keybindings(
     device: torch.device = _default_device,
-    dtype=torch.float
+    dtype: torch.dtype = torch.float32
 ):
     keybindings = pd.read_csv(Path() / 'data/keybindings.csv', header=0)
     keybindings['location_input'] = torch.from_numpy(keybindings[['X', 'Y', 'Z']].values).to(dtype).unbind(0)
@@ -57,7 +96,7 @@ def get_keybindings(
 
 def user_input_mapper(
     device: torch.device = _default_device,
-    dtype=torch.float32
+    dtype: torch.dtype = torch.float32
 ):
     """
     Polls user input events from the mouse and keyboard and uses them to calculate
@@ -90,7 +129,7 @@ class ConfigurationIntegrator(nn.Module):
         self,
         initial_position: list[tuple[float, float, float]] = [(0., 0., 0.)],
         initial_orientation: list[tuple[float, float, float]] = [(1., 0., 0., 0.)],
-        dtype=torch.float32
+        dtype: torch.dtype = torch.float32
     ):
         super().__init__()
         self.register_buffer('position', torch.tensor(initial_position, dtype=dtype))
@@ -126,7 +165,7 @@ class RenderLoop(nn.Module):
         sensor_width: float = 17e-3,
         sensor_height: float = 17e-3,
         marching_steps: int = 32,
-        dtype=torch.float32
+        dtype: torch.dtype = torch.float32
     ):
         super().__init__()
         self.scene = scene

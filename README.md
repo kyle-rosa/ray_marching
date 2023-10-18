@@ -92,12 +92,11 @@ I've used the TorchWindow package [2] to display rendered frames without moving 
     2. Sampling:
         1. Multiple samples per pixel.
 2. Control:
-    1. Replace the janky cv2/pyautogui combo with something more unified - pygame or something?
+    1. Replace the janky cv2/pyautogui combo with Pynput [3].
 3. Speed optimisations:
     1. Support for half precision computations. 
         1. I've played with this but there wasn't a massive speed-up, and it required introducing a new "dtype" keyword that runs through all the classes. I think there's got to be a better approach.
     2. Some kind of bounding box hierarchy implementation?
-    3. Getting data from the GPU to the screen more efficiently. There's curently a big slowdown when I move rendered frames off the GPU to display them.
 
 ## References:
 1. Inigo Quilez, https://iquilezles.org/.

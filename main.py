@@ -8,15 +8,18 @@ from control import RenderLoop, user_input_generator, user_input_mapper
 from rendering.display import make_display_manager
 from scene.scene_registry import make_simple_scene, make_test_scene
 
+
 torch.set_float32_matmul_precision(precision='high')
 
 
 if __name__=='__main__':
     device = torch.device('cuda')
-    dtype = torch.float32
+    dtype = torch.float16
 
-    px_width = 1_200
-    px_height = 800
+    px_width = 1_440
+    px_height = 900
+
+    px_size = 3.45e-6
 
     scene = make_test_scene(dtype=dtype)
     render_loop = RenderLoop(
@@ -24,9 +27,9 @@ if __name__=='__main__':
         num_cameras=1,
         px_width=px_width,
         px_height=px_height,
-        focal_length=17e-3,
-        sensor_width=17e-3,
-        sensor_height=17e-3,
+        focal_length=(px_size * px_height),
+        sensor_width=(px_size * px_width),
+        sensor_height=(px_size * px_height),
         marching_steps=32,
         dtype=dtype,
     ).to(device)
@@ -49,6 +52,7 @@ if __name__=='__main__':
 
     # optimizer = torch.optim.AdamW(params=render_loop.parameters(), lr=0.001)
 
+    old_time = time.time()
     while True:
         # optimizer.zero_grad()
         (ndc_mouse_offset, key) = user_input.send(None)
@@ -72,3 +76,7 @@ if __name__=='__main__':
         with torch.no_grad():
             render = images[mode_index[mode]].mul(baseline)
             display_manager.send(render)
+
+        new_time = time.time()
+        print( f'{round(1 / (new_time - old_time), 2)} frames per second' )
+        old_time = new_time
