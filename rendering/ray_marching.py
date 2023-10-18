@@ -15,6 +15,7 @@ class PinholeCamera(nn.Module):
         focal_length: float,
         sensor_width: float,
         sensor_height: float,
+        dtype=torch.float32
     ):
         super().__init__()
         self.num_cameras = num_cameras
@@ -25,23 +26,23 @@ class PinholeCamera(nn.Module):
 
         self.register_buffer(
             'focus', 
-            torch.tensor([[[[0., 0., focal_length]]]]).expand(num_cameras, 1, 1, 3)
+            torch.tensor([[[[0., 0., focal_length]]]], dtype=dtype).expand(num_cameras, 1, 1, 3)
         )
         self.register_buffer(
             'theta', 
-            torch.tensor([[[sensor_height / 2, 0., 0.], [0., sensor_width / 2, 0.]]]).expand(num_cameras, 2, 3)
+            torch.tensor([[[sensor_height / 2, 0., 0.], [0., sensor_width / 2, 0.]]], dtype=dtype).expand(num_cameras, 2, 3)
         )
         self.register_buffer(
             'ray_positions', 
-            F.pad(F.affine_grid(theta=self.theta, size=self.size, align_corners=False), pad=[0, 1], value=0.)
+            F.pad(F.affine_grid(theta=self.theta.float(), size=self.size, align_corners=False), pad=[0, 1], value=0.).to(dtype=dtype)
         )
         self.register_buffer(
             'ray_directions', 
-            F.normalize(self.focus.sub(self.ray_positions), p=2, dim=-1, eps=0)
+            F.normalize(self.focus.sub(self.ray_positions).cuda(), p=2, dim=-1, eps=0)
         )
         self.register_buffer(
             'pixel_frames', 
-            torch.eye(3)[None, None, None, [0, 1], :].expand(num_cameras, 1, 1, 2, 3)
+            torch.eye(3, dtype=dtype)[None, None, None, [0, 1], :].expand(num_cameras, 1, 1, 2, 3)
         )
         self.quaternion_to_so3 = Q.QuaternionToSO3()
 

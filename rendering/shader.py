@@ -10,7 +10,11 @@ import quaternion as Q
 
 
 class SDFNormals(torch.nn.Module):
-    def __init__(self, sdf_scene):
+    def __init__(
+            self, 
+            sdf_scene, 
+            dtype
+        ):
         super().__init__()
         self.register_buffer(
             'offsets',
@@ -20,14 +24,20 @@ class SDFNormals(torch.nn.Module):
                     [-1., 0., -0.5**0.5],
                     [0., 1., 0.5**0.5],
                     [0., -1., 0.5**0.5],
-                ]
-            ).mul(1e-4)
+                ], dtype=torch.double
+            ).mul(1e-2)
         )
         self.register_buffer(
             'relative_offsets', 
             self.offsets[..., [1, 2, 3], :].sub(self.offsets[..., [0], :])
         )
-        self.register_buffer('offsets_inverse', self.relative_offsets.inverse())
+        self.register_buffer(
+            'offsets_inverse', 
+            self.relative_offsets.inverse()
+        )
+        self.offsets = self.offsets.to(dtype)
+        self.relative_offsets = self.relative_offsets.to(dtype)
+        self.offsets_inverse = self.offsets_inverse.to(dtype)
         self.sdf_scene = sdf_scene
         
     def forward(self, surface_coords):
@@ -148,11 +158,12 @@ class Shader(nn.Module):
     def __init__(
         self,
         cyclic_cmap: Tensor = torch.load(Path() / 'data/cyclic_cmap.pt'),
-        decay_factor: float = 0.01
+        decay_factor: float = 0.01,
+        dtype=torch.float,
     ):
         super().__init__()
-        self.register_buffer('cyclic_cmap', cyclic_cmap.clone())
-        self.register_buffer('decay_factor', torch.tensor(decay_factor))
+        self.register_buffer('cyclic_cmap', cyclic_cmap.clone().to(dtype))
+        self.register_buffer('decay_factor', torch.tensor(decay_factor, dtype=dtype))
 
         self.lambertian_shader = LambertianShader()
         self.normal_shader = NormalShader()

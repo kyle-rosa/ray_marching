@@ -15,7 +15,7 @@ In contrast with other rendering methods that use textured meshes, ray marching 
 4. An interactive first person control system for the camera that uses mouse and keyboard inputs.
 
 ### Differentiability
-All scene construction and rendering functions are implemented in PyTorch and are fully differentiable. This allows us to optimise the scene parameters based on the pixel values of the rendered output image.
+All scene construction and rendering functions are implemented in PyTorch and are fully differentiable. This allows us to backproagate gradients through the rendering process, and optimise the scene parameters based on the pixel values of the rendered output image.
 
 ## Design and Implementation Details
 ### SDF Constructive Geometry System
@@ -38,7 +38,7 @@ I've implemented a rudimentary constructive geometry system for signed distance 
 #### Quaternions and 3D Rotations
 Wherever possible, I've encoded rotations with quaternions. 
 
-The space of 3D rotations has a ``hole" in it. Paths through the space of 3D rotations can become knotted on this hole and negatively impact the result of gradient descent algorithms, while using quaternions avoids this. 
+The space of 3D rotations has a ``hole" in it. Paths through the space of 3D rotations can become knotted on this hole, which negatively impacts gradient descent algorithms. For example, consider a sequence $R_0, R_1, ..., R_N$ of rotations where $R_0=R_N=I$ and each $R_i^{-1}R_{i+1}$ is small. If the sequence traces out a path around the hole, it will be impossible to continuously deform it into a path that doesn't, such as the path where each $R_i$ is the identity. This phenomenon doesn't occur if the rotations are encoded with quaternions instead.
 
 Using quaternions everywhere also allows us to track the spin orientation between objects as they move around the scene. Going further, we can design shaders that actually render objects differently based on their spin orientation relative to the camera.
 
@@ -78,6 +78,11 @@ Surfaces are coloured based on a combination of their normal vector and the quat
 Uses cv2 to poll keyboard inputs and pyautogui to poll mouse movements.
 These are compiled into an affine transformation that's used to update the camera position and orientation each frame.
 
+### Display
+I've used the TorchWindow package [2] to display rendered frames without moving any data off the GPU. 
+
+<!-- #### Lie Groups and Algebras -->
+
 ## TODO
 1. Rendering:
     1. Light transport modelling:
@@ -88,7 +93,13 @@ These are compiled into an affine transformation that's used to update the camer
         1. Multiple samples per pixel.
 2. Control:
     1. Replace the janky cv2/pyautogui combo with something more unified - pygame or something?
-3. Support for half precision computations.
+3. Speed optimisations:
+    1. Support for half precision computations. 
+        1. I've played with this but there wasn't a massive speed-up, and it required introducing a new "dtype" keyword that runs through all the classes. I think there's got to be a better approach.
+    2. Some kind of bounding box hierarchy implementation?
+    3. Getting data from the GPU to the screen more efficiently. There's curently a big slowdown when I move rendered frames off the GPU to display them.
 
 ## References:
 1. Inigo Quilez, https://iquilezles.org/.
+2. TorchWindow, https://github.com/jbaron34/torchwindow/.
+3. Pynput, https://pynput.readthedocs.io/en/latest/index.html.

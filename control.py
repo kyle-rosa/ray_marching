@@ -11,51 +11,61 @@ from torch import Tensor
 import quaternion as Q
 from rendering.ray_marching import Marcher, PinholeCamera
 from rendering.shader import SDFNormals, Shader
-from scene.scene_registry import make_test_scene
 
 
 _default_device = torch.device('cpu')
 
+
 def user_input_generator(
-    device: torch.device = _default_device
+    device: torch.device = _default_device,
+    dtype=torch.float32
 ):
     screen_size = (pyautogui.size().width//2, pyautogui.size().height)
     screen_centre = tuple(it//2 for it in screen_size)
 
-    mu = torch.tensor(screen_centre, device=device)
-    sigma = torch.tensor(screen_size, device=device).add(1).div(2)
+    mu = torch.tensor(screen_centre, device=device, dtype=dtype)
+    sigma = torch.tensor(screen_size, device=device, dtype=dtype).add(1).div(2)
 
     pyautogui.moveTo(*screen_centre)
-    ndc_mouse_offset = torch.zeros(2, device=device)
+    ndc_mouse_offset = torch.zeros(2, device=device, dtype=dtype)
     
     while True: 
         key = cv2.waitKey(1) & 0xFF
         yield (ndc_mouse_offset, key)
 
         pos = pyautogui.position()
-        ndc_mouse_offset = torch.tensor([pos.x, pos.y], device=device, dtype=torch.float32).sub(mu).div(sigma).clamp(-0.99, 0.99)
-        pyautogui.moveTo(*screen_centre, _pause=False)
+        ndc_mouse_offset = (
+            torch.tensor([pos.x, pos.y], device=device, dtype=dtype)
+            .sub(mu).div(sigma).clamp(-0.99, 0.99)
+        )
+        # pyautogui.moveTo(*screen_centre, _pause=False)
 
 
 def get_keybindings(
     device: torch.device = _default_device,
+    dtype=torch.float
 ):
     keybindings = pd.read_csv(Path() / 'data/keybindings.csv', header=0)
-    keybindings['location_input'] = torch.from_numpy(keybindings[['X', 'Y', 'Z']].values).float().unbind(0)
-    keybindings['orientation_input'] = torch.from_numpy(keybindings[['YZ', 'ZX', 'XY']].values).float().unbind(0)
-    keybindings['location_input'] = keybindings['location_input'].apply(lambda x: x.to(device=device))
-    keybindings['orientation_input'] = keybindings['orientation_input'].apply(lambda x: x.to(device=device))
+    keybindings['location_input'] = torch.from_numpy(keybindings[['X', 'Y', 'Z']].values).to(dtype).unbind(0)
+    keybindings['orientation_input'] = torch.from_numpy(keybindings[['YZ', 'ZX', 'XY']].values).to(dtype).unbind(0)
+    keybindings['location_input'] = keybindings['location_input'].apply(lambda x: x.to(device=device, dtype=dtype))
+    keybindings['orientation_input'] = keybindings['orientation_input'].apply(lambda x: x.to(device=device, dtype=dtype))
     keybindings['ord'] = keybindings['key'].apply(ord)
     keybindings = keybindings.set_index('ord')
     return keybindings.T.to_dict()
 
 
 def user_input_mapper(
-    device: torch.device = _default_device
+    device: torch.device = _default_device,
+    dtype=torch.float32
 ):
-    keybindings = get_keybindings(device=device)
-    default_position_input = torch.zeros((1, 3), device=device)
-    default_orientation_input = torch.zeros((1, 3), device=device)
+    """
+    Polls user input events from the mouse and keyboard and uses them to calculate
+    position and orientation updates.
+    """
+    keybindings = get_keybindings(device=device, dtype=dtype)
+    default_position_input = torch.zeros((1, 3), device=device, dtype=dtype)
+    default_orientation_input = torch.zeros((1, 3), device=device, dtype=dtype)
     
     position_input = default_position_input
     orientation_input = default_orientation_input
@@ -79,11 +89,12 @@ class ConfigurationIntegrator(nn.Module):
     def __init__(
         self,
         initial_position: list[tuple[float, float, float]] = [(0., 0., 0.)],
-        initial_orientation: list[tuple[float, float, float]] = [(1., 0., 0., 0.)]
+        initial_orientation: list[tuple[float, float, float]] = [(1., 0., 0., 0.)],
+        dtype=torch.float32
     ):
         super().__init__()
-        self.register_buffer('position', torch.tensor(initial_position))
-        self.register_buffer('orientation', torch.tensor(initial_orientation))
+        self.register_buffer('position', torch.tensor(initial_position, dtype=dtype))
+        self.register_buffer('orientation', torch.tensor(initial_orientation, dtype=dtype))
 
     def forward(
         self,
@@ -107,6 +118,7 @@ class ConfigurationIntegrator(nn.Module):
 class RenderLoop(nn.Module):
     def __init__(
         self,
+        scene,
         num_cameras: int = 1,
         px_width: int = 800,
         px_height: int = 800,
@@ -114,12 +126,14 @@ class RenderLoop(nn.Module):
         sensor_width: float = 17e-3,
         sensor_height: float = 17e-3,
         marching_steps: int = 32,
+        dtype=torch.float32
     ):
         super().__init__()
-        self.scene = make_test_scene()
+        self.scene = scene
         self.integrator = ConfigurationIntegrator(
             initial_position=[(0., 0., 0.)],
             initial_orientation=[(1., 0., 0., 0.)],
+            dtype=dtype
         )
         self.camera = PinholeCamera(
             num_cameras=num_cameras,
@@ -128,17 +142,20 @@ class RenderLoop(nn.Module):
             focal_length=focal_length,
             sensor_width=sensor_width,
             sensor_height=sensor_height,
+            dtype=dtype
         )
         self.marcher = Marcher(
             sdf_scene=self.scene,
-            marching_steps=marching_steps
+            marching_steps=marching_steps,
         )
         self.shader = Shader(
             cyclic_cmap=torch.load(Path() / 'data/cyclic_cmap.pt'),
-            decay_factor=0.01
+            decay_factor=0.01,
+            dtype=dtype
         )
         self.normals = SDFNormals(
-            sdf_scene=self.scene
+            sdf_scene=self.scene,
+            dtype=dtype
         )
 
 
@@ -148,7 +165,7 @@ class RenderLoop(nn.Module):
         translation_input: Tensor,
         degree: int = 1
     ):
-        orientations, translations = self.integrator(orientation_input, translation_input)
+        (orientations, translations) = self.integrator(orientation_input, translation_input)
         (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(orientations, translations)
         marched_ray_pos = self.marcher(ray_pos, ray_dirs)
         surface_normals = self.normals(marched_ray_pos)

@@ -1,10 +1,12 @@
 import itertools
+import pprint
+import time
 
 import torch
 
 from control import RenderLoop, user_input_generator, user_input_mapper
 from rendering.display import make_display_manager
-
+from scene.scene_registry import make_simple_scene, make_test_scene
 
 torch.set_float32_matmul_precision(precision='high')
 
@@ -13,26 +15,27 @@ if __name__=='__main__':
     device = torch.device('cuda')
     dtype = torch.float32
 
-    torch.set_default_dtype(dtype)
+    px_width = 1_200
+    px_height = 800
 
+    scene = make_test_scene(dtype=dtype)
     render_loop = RenderLoop(
+        scene=scene,
         num_cameras=1,
-        px_width=800,
-        px_height=800,
+        px_width=px_width,
+        px_height=px_height,
         focal_length=17e-3,
         sensor_width=17e-3,
         sensor_height=17e-3,
         marching_steps=32,
+        dtype=dtype,
     ).to(device)
     render_loop = torch.compile(render_loop)
     # render_loop = torch.compile(render_loop, mode='max-autotune')
 
-    user_input = user_input_generator(device)
-    input_mapper = user_input_mapper(device)
-    display_manager = make_display_manager(
-        window_width=800,
-        window_height=800
-    )
+    user_input = user_input_generator(device=device, dtype=dtype)
+    input_mapper = user_input_mapper(device=device, dtype=dtype)
+    display_manager = make_display_manager(window_width=px_width, window_height=px_height, device=device)
 
     user_input.send(None)
     input_mapper.send(None)
@@ -44,7 +47,7 @@ if __name__=='__main__':
     degree = torch.tensor(1).to(device=device)
     mode_index = {v: k for (k, v) in enumerate(modes)}
 
-    # optimizer = torch.optim.AdamW(params=render_loop.parameters(), lr=0.01)
+    # optimizer = torch.optim.AdamW(params=render_loop.parameters(), lr=0.001)
 
     while True:
         # optimizer.zero_grad()
@@ -66,4 +69,6 @@ if __name__=='__main__':
         # loss.backward()
         # optimizer.step()
 
-        display_manager.send(images[mode_index[mode]].mul(baseline))
+        with torch.no_grad():
+            render = images[mode_index[mode]].mul(baseline)
+            display_manager.send(render)
