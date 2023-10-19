@@ -5,17 +5,17 @@ from .transformations import SDFOnion, SDFRounding, SDFSmoothUnion, SDFUnion, SD
 def make_test_scene(dtype):
     return SDFSmoothUnion(
             sdfs=[
-                SDFOnion(
-                    SDFAffineTransformation(
-                        orientation=[[0.9014, 0.25, 0.25, 0.25], [1.0, 0.0, 0.0, 0.0]], 
-                        translation=[[0.0, 0.25, .25], [0., 1.0, 0.5]],
-                        sdf=SDFBoxes(
+                SDFAffineTransformation(
+                    orientation=[[0.9014, 0.25, 0.25, 0.25], [0.9014, -0.25, 0.25, 0.25]], 
+                    translation=[[0.0, 0.25, .25], [0., 1.0, 0.5]],
+                    sdf=SDFOnion(
+                        SDFBoxes(
                             halfsides=[[0.1, 0.2, 0.05], [5., 5., 5.]],
                             dtype=dtype
                         ),
-                        dtype=dtype
+                        radii=[[0.05], [0.1]],
+                        dtype=dtype,
                     ),
-                    radii=[[0.01]],
                     dtype=dtype
                 ),
                 SDFAffineTransformation(

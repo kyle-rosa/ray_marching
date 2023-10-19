@@ -49,6 +49,9 @@ class EventAggregator():
                 on_release=on_release
             )
         }
+        self.controllers = {
+            'mouse': mouse.Controller()
+        }
         for listener in listeners.values():
             listener.start()
 
@@ -75,8 +78,11 @@ def user_input_generator(
         (mouse_state, keyboard_state) = event_aggregator.get_state()
         mouse_state = torch.tensor([mouse_state[0],  mouse_state[1]], device=device, dtype=dtype)
         ndc_mouse_offset = (mouse_state.sub(mu).div(sigma).clamp(-0.99, 0.99))
-        keys = [ord(k.char) for (k, v) in keyboard_state.items() if v]
-        key = (keys + [None])[0]
+        keys = [ord(k.char) for (k, v) in keyboard_state.items() if (v and (type(k)==keyboard.KeyCode))]
+        key = (keys[0] if keys else None)
+
+        event_aggregator.controllers['mouse'].position = screen_centre
+
         yield (ndc_mouse_offset, key)
 
 
@@ -147,7 +153,7 @@ class ConfigurationIntegrator(nn.Module):
         self.orientation = F.normalize(
             Q.multiply(
                 self.orientation,
-                Q.to_versor(orientation_input.div(10)).expand_as(self.orientation)
+                Q.to_versor(orientation_input.div(4)).expand_as(self.orientation)
             ),
             p=2, dim=-1, eps=0
         )

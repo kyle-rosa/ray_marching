@@ -34,6 +34,7 @@ class SDFAffineTransformation(nn.Module):
         self, 
         query_positions: Tensor
     ) -> Tensor:
+        
         return self.sdf(
             Q.rotation(
                 query_positions[..., None, :].sub(self.translation), 

@@ -16,10 +16,10 @@ if __name__=='__main__':
     device = torch.device('cuda')
     dtype = torch.float16
 
-    px_width = 1_440
-    px_height = 900
-
+    px_width = 1_280
+    px_height = 720
     px_size = 3.45e-6
+    marching_steps = 32
 
     scene = make_test_scene(dtype=dtype)
     render_loop = RenderLoop(
@@ -30,7 +30,7 @@ if __name__=='__main__':
         focal_length=(px_size * px_height),
         sensor_width=(px_size * px_width),
         sensor_height=(px_size * px_height),
-        marching_steps=32,
+        marching_steps=marching_steps,
         dtype=dtype,
     ).to(device)
     render_loop = torch.compile(render_loop)
@@ -68,13 +68,13 @@ if __name__=='__main__':
 
         (orientation_input, translation_input) = input_mapper.send((ndc_mouse_offset, key))
         (baseline, images) = render_loop(orientation_input, translation_input, degree)
+        render = images[mode_index[mode]].mul(baseline)
 
         # loss = images[-1].var().sum()
         # loss.backward()
         # optimizer.step()
 
         with torch.no_grad():
-            render = images[mode_index[mode]].mul(baseline)
             display_manager.send(render)
 
         new_time = time.time()

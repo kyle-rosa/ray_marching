@@ -24,9 +24,14 @@ class SDFNormals(torch.nn.Module):
                     [-1., 0., -0.5**0.5],
                     [0., 1., 0.5**0.5],
                     [0., -1., 0.5**0.5],
-                ], dtype=torch.double
-            ).mul(1e-2)
+                ], 
+                dtype=torch.double
+            ).mul(5e-2)
         )
+        # random_rotation = torch.randn(4, dtype=torch.double)
+        # random_rotation = random_rotation.div(random_rotation.pow(2).sum().pow(1/2))
+        # self.offsets = Q.rotation(self.offsets, random_rotation)
+
         self.register_buffer(
             'relative_offsets', 
             self.offsets[..., [1, 2, 3], :].sub(self.offsets[..., [0], :])
@@ -38,15 +43,15 @@ class SDFNormals(torch.nn.Module):
         self.offsets = self.offsets.to(dtype)
         self.relative_offsets = self.relative_offsets.to(dtype)
         self.offsets_inverse = self.offsets_inverse.to(dtype)
+        
         self.sdf_scene = sdf_scene
         
     def forward(self, surface_coords):
         offset_values = self.sdf_scene(surface_coords[..., None, :].add(self.offsets))
         d_values = offset_values[..., [1, 2, 3], :].sub(offset_values[..., [0], :])
-        return F.normalize(
-            self.offsets_inverse.mul(d_values[..., None, :, 0]).sum(dim=-1),
-            dim=-1, p=2, eps=0.
-        )
+        normals = self.offsets_inverse.mul(d_values[..., None, :, 0]).sum(dim=-1)
+        normals = F.normalize(normals, dim=-1, p=2, eps=0.)
+        return normals
 
 
 def functional_make_sdf_distance_and_normal(sdf_scene, surface_coords):

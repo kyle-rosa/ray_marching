@@ -84,21 +84,30 @@ I've used the TorchWindow package [2] to display rendered frames without moving 
 <!-- #### Lie Groups and Algebras -->
 
 ## TODO
+### Under Construction
+1. Replace the rigid $1$ sample-per-pixel rendering method with a more standard ray tracing method that randomly samples points over screen space, traces rays through them, and then aggregates the values onto pixels.
+2. Clean up:
+    1. User input handling in control.py
+    2. Shader functions in shader.py
+3. Debug rendering artifacts when using half-precision.
+
+### Roadmap and Backlog
 1. Rendering:
     1. Light transport modelling:
         1. Colour rendering.
         2. Reflections.
         3. Refractions.
-    2. Sampling:
-        1. Multiple samples per pixel.
+    2. Improved sampling:
+        1. Dynamic sampling of screen space.
+        2. Interpolate samples to colour missing pixels.
 2. Control:
     1. Replace the janky cv2/pyautogui combo with Pynput [3].
 3. Speed optimisations:
     1. Support for half precision computations. 
-        1. I've played with this but there wasn't a massive speed-up, and it required introducing a new "dtype" keyword that runs through all the classes. I think there's got to be a better approach.
+        1. I've played with this but it required introducing a new "dtype" keyword that runs through all the classes. I think there's got to be a better approach.
     2. Some kind of bounding box hierarchy implementation?
 
-## References:
+## References
 1. Inigo Quilez, https://iquilezles.org/.
 2. TorchWindow, https://github.com/jbaron34/torchwindow/.
 3. Pynput, https://pynput.readthedocs.io/en/latest/index.html.
