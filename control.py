@@ -8,15 +8,15 @@ import torch.nn.functional as F
 from torch import Tensor
 
 import quaternion as Q
-from rendering.ray_marching import Marcher, PinholeCamera
-from rendering.shader import SDFNormals, Shader
+from rendering.ray_marching import (PinholeCamera, SDFMarcher, SDFNormals)
+from rendering.shader import Shader
 
-from pynput import mouse, keyboard
+from pynput import (mouse, keyboard)
 from collections import defaultdict
 
 
 _default_device = torch.device('cpu')
-
+_default_dtype = torch.float32
 
 class EventAggregator():
     def __init__(self):
@@ -61,7 +61,7 @@ class EventAggregator():
 
 def user_input_generator(
     device: torch.device = _default_device,
-    dtype: torch.dtype = torch.float32
+    dtype: torch.dtype = _default_dtype
 ):
     screen_size = (pyautogui.size().width//2, pyautogui.size().height)
     screen_centre = tuple(it//2 for it in screen_size)
@@ -76,6 +76,7 @@ def user_input_generator(
 
     while True: 
         (mouse_state, keyboard_state) = event_aggregator.get_state()
+        mouse_state = screen_centre
         mouse_state = torch.tensor([mouse_state[0],  mouse_state[1]], device=device, dtype=dtype)
         ndc_mouse_offset = (mouse_state.sub(mu).div(sigma).clamp(-0.99, 0.99))
         keys = [ord(k.char) for (k, v) in keyboard_state.items() if (v and (type(k)==keyboard.KeyCode))]
@@ -88,7 +89,7 @@ def user_input_generator(
 
 def get_keybindings(
     device: torch.device = _default_device,
-    dtype: torch.dtype = torch.float32
+    dtype: torch.dtype = _default_dtype
 ):
     keybindings = pd.read_csv(Path() / 'data/keybindings.csv', header=0)
     keybindings['location_input'] = torch.from_numpy(keybindings[['X', 'Y', 'Z']].values).to(dtype).unbind(0)
@@ -102,7 +103,7 @@ def get_keybindings(
 
 def user_input_mapper(
     device: torch.device = _default_device,
-    dtype: torch.dtype = torch.float32
+    dtype: torch.dtype = _default_dtype
 ):
     """
     Polls user input events from the mouse and keyboard and uses them to calculate
@@ -135,7 +136,7 @@ class ConfigurationIntegrator(nn.Module):
         self,
         initial_position: list[tuple[float, float, float]] = [(0., 0., 0.)],
         initial_orientation: list[tuple[float, float, float]] = [(1., 0., 0., 0.)],
-        dtype: torch.dtype = torch.float32
+        dtype: torch.dtype = _default_dtype
     ):
         super().__init__()
         self.register_buffer('position', torch.tensor(initial_position, dtype=dtype))
@@ -154,8 +155,7 @@ class ConfigurationIntegrator(nn.Module):
             Q.multiply(
                 self.orientation,
                 Q.to_versor(orientation_input.div(4)).expand_as(self.orientation)
-            ),
-            p=2, dim=-1, eps=0
+            ), p=2, dim=-1, eps=0
         )
         return (self.orientation, self.position)
 
@@ -171,7 +171,8 @@ class RenderLoop(nn.Module):
         sensor_width: float = 17e-3,
         sensor_height: float = 17e-3,
         marching_steps: int = 32,
-        dtype: torch.dtype = torch.float32
+        normals_eps: float = 5e-2,
+        dtype: torch.dtype = _default_dtype
     ):
         super().__init__()
         self.scene = scene
@@ -189,20 +190,20 @@ class RenderLoop(nn.Module):
             sensor_height=sensor_height,
             dtype=dtype
         )
-        self.marcher = Marcher(
+        self.marcher = SDFMarcher(
             sdf_scene=self.scene,
             marching_steps=marching_steps,
+        )
+        self.normals = SDFNormals(
+            sdf_scene=self.scene,
+            normals_eps=normals_eps,
+            dtype=dtype
         )
         self.shader = Shader(
             cyclic_cmap=torch.load(Path() / 'data/cyclic_cmap.pt'),
             decay_factor=0.01,
             dtype=dtype
         )
-        self.normals = SDFNormals(
-            sdf_scene=self.scene,
-            dtype=dtype
-        )
-
 
     def forward(
         self,
@@ -213,9 +214,11 @@ class RenderLoop(nn.Module):
         (orientations, translations) = self.integrator(orientation_input, translation_input)
         (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(orientations, translations)
         marched_ray_pos = self.marcher(ray_pos, ray_dirs)
-        surface_normals = self.normals(marched_ray_pos)
+        surface_distances = self.scene(marched_ray_pos)
+        surface_normals, surface_laplacian = self.normals(marched_ray_pos)
         return self.shader(
             pixel_pos, orientations, pixel_frames, 
-            ray_dirs, marched_ray_pos, surface_normals,
-            degree=degree
+            ray_dirs, marched_ray_pos, 
+            surface_normals, surface_laplacian,
+            surface_distances, degree=degree
         )

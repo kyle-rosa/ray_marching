@@ -8,7 +8,7 @@ dependencies:
   - python=3.11
   - pytorch=2.1
   - pytorch-cuda=12.1
-  - opencv=4.7.0
+  # - opencv=4.7.0
   - pandas=1.5.3
   - pyautogui=0.9.54
   - pysdl2=0.9.16  # torchwindow

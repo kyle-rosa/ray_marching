@@ -151,3 +151,23 @@ class SDFOnion(nn.Module):
         query_coords: Tensor
     ) -> Tensor:
         return self.sdf(query_coords).abs().sub(self.radii)
+
+
+# class SDFRepeat(nn.Module):
+#     def __init__(
+#         self,
+#         sdf: nn.Module,
+#         radii: float,
+#         dtype
+#     ):
+#         super().__init__()
+#         self.sdf = sdf
+#         # self.register_buffer('radii',  torch.tensor(radii))
+#         self.radii = nn.Parameter(torch.tensor(radii, dtype=dtype))
+
+#     def forward(
+#         self,
+#         query_coords: Tensor
+#     ) -> Tensor:
+        
+#         return self.sdf(query_coords)

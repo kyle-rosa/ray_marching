@@ -17,6 +17,8 @@ In contrast with other rendering methods that use textured meshes, ray marching 
 ### Differentiability
 All scene construction and rendering functions are implemented in PyTorch and are fully differentiable. This allows us to backproagate gradients through the rendering process, and optimise the scene parameters based on the pixel values of the rendered output image.
 
+
+
 ## Design and Implementation Details
 ### SDF Constructive Geometry System
 I've implemented a rudimentary constructive geometry system for signed distance functions, largely based on the work in reference [1]. This includes: 
@@ -78,10 +80,12 @@ Surfaces are coloured based on a combination of their normal vector and the quat
 Uses cv2 to poll keyboard inputs and pyautogui to poll mouse movements.
 These are compiled into an affine transformation that's used to update the camera position and orientation each frame.
 
+<!-- #### Lie Groups and Algebras -->
+<!-- $\exp: \mathfrak{gl}_3 \to \text{Spin}_3$ -->
+
 ### Display
 I've used the TorchWindow package [2] to display rendered frames without moving any data off the GPU. 
 
-<!-- #### Lie Groups and Algebras -->
 
 ## TODO
 ### Under Construction
@@ -89,6 +93,8 @@ I've used the TorchWindow package [2] to display rendered frames without moving 
 2. Clean up:
     1. User input handling in control.py
     2. Shader functions in shader.py
+    3. The pandas dependency is definitely unnecessary and I should get rid of it.
+    4. I'd like to get rid of the pyautogui dependency too, which I'm using to get the scren size.
 3. Debug rendering artifacts when using half-precision.
 
 ### Roadmap and Backlog
@@ -101,11 +107,17 @@ I've used the TorchWindow package [2] to display rendered frames without moving 
         1. Dynamic sampling of screen space.
         2. Interpolate samples to colour missing pixels.
 2. Control:
-    1. Replace the janky cv2/pyautogui combo with Pynput [3].
+    1. Finish removing pyautogui.
+        1. Need to query screen size somehow.
+    2. Implement ``cyclindical'' movement system with fixed up direction.
+    3. Hide mouse cursor.
 3. Speed optimisations:
     1. Support for half precision computations. 
         1. I've played with this but it required introducing a new "dtype" keyword that runs through all the classes. I think there's got to be a better approach.
     2. Some kind of bounding box hierarchy implementation?
+    3. Add PyTorch profiling script.
+    4. Test speed of different implementations of inverse affine transformations.
+
 
 ## References
 1. Inigo Quilez, https://iquilezles.org/.
