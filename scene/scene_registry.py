@@ -13,7 +13,7 @@ def make_test_scene(dtype):
                             halfsides=[[0.1, 0.2, 0.05], [5., 5., 5.]],
                             dtype=dtype
                         ),
-                        radii=[[0.05], [0.1]],
+                        radii=[[0.1], [0.2]],
                         dtype=dtype,
                     ),
                     dtype=dtype

@@ -5,10 +5,12 @@ import time
 import torch
 import torch.nn.functional as F
 
-from control import RenderLoop, user_input_generator, user_input_mapper
-from scene.scene_registry import make_test_scene
+from control import EventAggregator, RenderLoop
+from scene.scene_registry import make_simple_scene, make_test_scene
 
 from torchwindow import Window
+import torchvision
+from pathlib import Path
 
 
 torch.set_float32_matmul_precision(precision='high')
@@ -21,7 +23,7 @@ if __name__=='__main__':
     px_width = 1_280
     px_height = 720
     px_size = 3.45e-6
-    marching_steps = 32
+    marching_steps = 64
 
     scene = make_test_scene(dtype=dtype)
     render_loop = RenderLoop(
@@ -39,65 +41,35 @@ if __name__=='__main__':
     render_loop = torch.compile(render_loop)
     # render_loop = torch.compile(render_loop, mode='max-autotune')
 
-    user_input = user_input_generator(device=device, dtype=dtype)
-    input_mapper = user_input_mapper(device=device, dtype=dtype)
-    
-    window = Window(px_width * 2, px_height * 2, "Renderer")
-
-    user_input.send(None)
-    input_mapper.send(None)
-
+    events = EventAggregator(dtype=dtype).to(device)
+    window = Window(px_width, px_height, "Renderer")
     modes = [
         'lambertian', 'distance', 'proximity',
         'vignette', 'normal', 'laplacian',
         'tangent', 'spin'
     ]
-    modes_cycle = itertools.cycle(modes)
-    mode = next(modes_cycle)
-    degree = torch.tensor(1).to(device=device)
-    mode_index = {v: k for (k, v) in enumerate(modes)}
 
     # optimizer = torch.optim.AdamW(params=render_loop.parameters(), lr=0.001)
 
     old_time = time.time()
     with torch.no_grad():
-        while True:
+        while events.running:
             # optimizer.zero_grad()
-            (ndc_mouse_offset, key) = user_input.send(None)
+            (positions, orientations, mode, degree, marching_steps, save_frame) = events.get_state()
+            images = render_loop(orientations, positions, degree, marching_steps)
+            render = images[mode % len(modes)]#.expand(-1, -1, -1, 3)
+            # print(render.shape)
 
-            if key == ord("q"):
-                break
-            if key == ord("m"):
-                mode = next(modes_cycle)
-            if key == ord('i'):
-                degree = degree.add(1)
-            if key == ord('o'):
-                degree = degree.add(-1)
-
-            (orientation_input, translation_input) = input_mapper.send((ndc_mouse_offset, key))
-            (
-                lambertian_layer,
-                distance_layer,
-                proximity_layer,
-                vignette_layer,
-                normal_layer,
-                laplacian_layer,
-                tangent_layer,
-                spin_layer
-            ) = render_loop(orientation_input, translation_input, degree)
-            render = (
-                vignette_layer
-                .add(laplacian_layer)
-                .div(2)
-                .mul(vignette_layer)
-            )[..., [0, 0, 0]]
+            if save_frame:
+                for key, image in zip(modes, images):
+                    torchvision.utils.save_image(image.movedim(-1, -3), Path() / f'output/{key}.png')
 
             # loss = images[-1].var().sum()
             # loss.backward()
             # optimizer.step()
             
-            render_large = F.interpolate(render.movedim(-1, -3), scale_factor=(2, 2)).movedim(-3, -1)
-            window.draw(F.pad(render_large[0].float(), [0, 1], value=1.0))
+            # render_large = F.interpolate(render.movedim(-1, -3), scale_factor=(2, 2)).movedim(-3, -1)
+            window.draw(F.pad(render[0].float(), [0, 1], value=1.0))
 
             new_time = time.time()
             print( f'{round(1 / (new_time - old_time), 2)} frames per second' )

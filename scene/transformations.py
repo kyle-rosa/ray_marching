@@ -143,7 +143,6 @@ class SDFOnion(nn.Module):
     ):
         super().__init__()
         self.sdf = sdf
-        # self.register_buffer('radii',  torch.tensor(radii))
         self.radii = nn.Parameter(torch.tensor(radii, dtype=dtype))
 
     def forward(
@@ -153,7 +152,7 @@ class SDFOnion(nn.Module):
         return self.sdf(query_coords).abs().sub(self.radii)
 
 
-# class SDFRepeat(nn.Module):
+# class SDFCubicRepitition(nn.Module):
 #     def __init__(
 #         self,
 #         sdf: nn.Module,
