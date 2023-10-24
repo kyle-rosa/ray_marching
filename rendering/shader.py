@@ -63,7 +63,12 @@ class NormalShader(nn.Module):
         super().__init__()
 
     def forward(self, surface_normals):
-        return surface_normals.abs()
+        return (
+            surface_normals
+            .add(1).div(2)
+            .clamp(0, 1)
+            .pow(1/2.33)
+        )
 
 
 # Laplacian Shader

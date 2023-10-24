@@ -38,7 +38,7 @@ if __name__=='__main__':
         normals_eps=5e-2,
         dtype=dtype,
     ).to(device)
-    render_loop = torch.compile(render_loop)
+    # render_loop = torch.compile(render_loop)
     # render_loop = torch.compile(render_loop, mode='max-autotune')
 
     events = EventAggregator(dtype=dtype).to(device)
@@ -57,8 +57,11 @@ if __name__=='__main__':
             # optimizer.zero_grad()
             (positions, orientations, mode, degree, marching_steps, save_frame) = events.get_state()
             images = render_loop(orientations, positions, degree, marching_steps)
+            # images = tuple(image.mean(-2) for image in images)
             render = images[mode % len(modes)]#.expand(-1, -1, -1, 3)
             # print(render.shape)
+
+            render = images[0] * images[-1]
 
             if save_frame:
                 for key, image in zip(modes, images):

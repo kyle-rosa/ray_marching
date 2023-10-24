@@ -242,7 +242,9 @@ class RenderLoop(nn.Module):
         # num_rays = 2_000_000
         # points_screen = torch.rand((num_rays, 2), dtype=self.dtype, device=torch.device('cuda')).mul(2).sub(1)
         # (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(points_screen, orientations, translations)
+
         (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(orientations, translations)
+        
         marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
         surface_distances = self.scene(marched_ray_pos)
         (surface_normals, surface_laplacian) = self.normals(marched_ray_pos)
@@ -252,7 +254,6 @@ class RenderLoop(nn.Module):
             surface_normals, surface_laplacian,
             surface_distances, degree=degree
         )
-        # print([it.shape for it in images])
         # images = tuple(image.expand(num_rays, 3) for image in images)
         # images = tuple(
         #     aggregate_rays(

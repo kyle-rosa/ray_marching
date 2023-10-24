@@ -111,57 +111,60 @@ For a pixel $p$ with unit normal $n_p$, and letting $v_p$ be a unit vector from 
 $$I_p = (v_p \centerdot n_p)$$
 $$ = (\cos \theta)^2(\cos \theta)$$ -->
 
-#### Normals Shader
+#### Surface Normals
 Once we've found a ray-surface intersection point $p$, we can calculate the surface normal vector $N_p$ at $p$ by querying the SDF at nearby points and estimating the gradient numerically:
 $N_p = (\nabla f)(p)$. 
 
 Concretely, for $i=0, 1, 2, 3$ let $v_i$ be the vertices of a regualar tetrahedron centred at $0$. We estimate the derivative of $f$ in the direction of $v_i - v_0$ using $$(\nabla f)(p)\centerdot( \epsilon v_i -  \epsilon v_0) \approx f(p + \epsilon v_i) - f(p + \epsilon v_0),$$
 where $\epsilon$ is a small constant. We know the values of $p$, each $v_i$, and each $f(p+\epsilon v_i)$. This gives us $3$ equations in $3$ unknowns at every point $p$, allowing the gradient to be found by solving a simple linear system. As a curiosity, it's also possible to find the surface normal vector by back-propagating the value of $f(p)$ and inspecting the gradient of $p$. This is more commputationally intensive, but also more numerically accurate.
 
-Surfaces are coloured based on the coordinates of their normal vectors. To generate the image below, I translated surface normals $n_p = (x, y, z)$ to RGB values using $(\lvert x \rvert , \lvert y \rvert, \lvert z \rvert)$.
+Surfaces are coloured based on the coordinates of their normal vectors. To generate the image below, I translated surface normals $N_p = (x, y, z)$ to RGB values using $(\lvert x \rvert , \lvert y \rvert, \lvert z \rvert)$.
 <p align="center">
   <img src="gallery/normal.png?raw=true" width="600"> 
 </p>
 
-#### Surface SDF Laplacian
+#### Surface Laplacian
 We can also use the values of $f(p+\epsilon v_i)$ to numerically estimate the Laplacian $\Delta f$ of $f$. This is because the Laplacian represents the difference between $f(p)$ and the average value of $f$ over a small sphere centred on $p$. Explicitly, for a function $f: \mathbb{R}^n\to\mathbb{R}$ the average value $\overline{f}(p, h)$ of $f$ over a sphere of radius $h$ centred at $p$ is given by
-$$ \overline{f}(p, h) = f(p) - \frac{(\Delta f)(p)}{2n}h^2 + (\ldots).$$
+$$\overline{f}(p, h) \approx f(p) - \frac{(\Delta f)(p)}{2n}h^2.$$
 
-Using $\overline{f}(p, \epsilon) =  \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i)$ we get 
-$$(\Delta f)(p) \approx \frac{2n}{h^2} \left( f(p) - \overline{f}(p, \epsilon) \right)$$
-$$= \frac{2n}{h^2} \left( f(p) - \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i) \right)$$
-$$= \frac{6}{h^2} \left( f(p) - \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i) \right).$$
+Using $$\overline{f}(p, \epsilon) =  \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i),$$
+we get 
+$$(\Delta f)(p) \approx \frac{2n}{\epsilon^2} \left( f(p) - \overline{f}(p, \epsilon) \right)$$
+$$= \frac{2n}{\epsilon^2} \left( f(p) - \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i) \right)$$
+$$= \frac{6}{\epsilon^2} \left( f(p) - \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i) \right).$$
 
 <p align="center">
   <img src="gallery/laplacian.png?raw=true" width="600"> 
 </p>
 
 
-
 #### Lambertian Shader
-Very simple geometric illumination model. Intensity $I_p$ is proportional to the cosine between the ray direction $v_p$ and the surface normal $(\nabla f)_p$. Symbolically, $I_p = v_p \centerdot (\nabla f)_p$. 
+Very simple geometric illumination model. Intensity $I_p$ is proportional to the cosine between the ray direction $v_p$ and the surface normal $N_p \approx (\nabla f)_p$. Symbolically, $I_p = v_p \centerdot N_p$. 
 <p align="center">
   <img src="gallery/lambertian.png?raw=true" width="600"> 
 </p>
 
 
 #### Tangents Shader
-Surface normals are projected onto the plane of the camera sensor, giving a vector $(u, v)\in\mathbb{R}^2$ with $u^2+v^2 \leq 1$. We can treat these projected vectors as complex numbers $u + iv$, and apply domain colouring techniques to visualise the result. 
+We project the surface normals $N_p$ onto the plane of the camera sensor, giving a vector $(\alpha, \beta)\in\mathbb{R}^2$ with $\alpha^2+\beta^2 \leq 1$. We can treat these projected vectors as complex numbers $\alpha + i\beta$, and apply domain colouring techniques to visualise the result. 
 
 <p align="center">
   <img src="gallery/tangent.png?raw=true" width="600"> 
 </p>
 
 #### Spin Shader
-Surfaces are coloured based on a combination of their normal vector and the quaternions that define the embeddings of the camera and object in world space. This shader mimics the behaviour of spin-$1/2$ objects in physics, as rotating the camera $360^\circ$ reverses the orientation of the texture on the surface.
-$$ (q_0v) / (q_1n) $$
+Surfaces are coloured based on a combination of their normal vector and the quaternions that define the embeddings of the camera and object in world space. This shader mimics the behaviour of spin-$1/2$ objects in physics, as rotating the camera $360^\circ$ reverses the orientation of the texture on the surface. If $N_p=(x, y, z)$ is the surface normal vector at pixel $p$, and $q$ is the quaternion encoding the embedding of the camera into space, we can define 
+$a + bi + cj + dk = \overline{q} N_p \in \mathbb{S}^3$. From there, we apply the function $$ a + bi + cj + dk \mapsto (a^2 - b^2 - c^2 - d^2) + 2a\sqrt{b^2 + c^2 + d^2} i \in \mathbb{S}^2.$$
+
+From here, we simply use a cyclic colourmap to translate points on $\mathbb{S}^2$ to pixel RGB values.
 <p align="center">
   <img src="gallery/spin.png?raw=true" width="600">
 </p>
 
 ### User Input and Camera Control
-Uses Pynput to process the user mouse and keyboard inputs.
-These are compiled into an affine transformation that's used to update the camera position and orientation each frame. 
+We use Pynput to process mouse and keyboard inputs.
+<!-- These are compiled into updates for the  -->
+<!-- These are compiled into an affine transformations that are used to update the camera position and orientation each frame.  -->
 
 The user can control the camera position and orientation, as well as the settings for a couple of rendering options. Each frame, we need to perform the following steps:
 1. Query the mouse and keyboard inputs.
@@ -170,7 +173,11 @@ The user can control the camera position and orientation, as well as the setting
 
 
 #### Lie Groups and Algebras
-$\exp: \mathbb{R}^3 \times \mathfrak{sl}_3 \to \mathbb{R}^3 \rtimes \text{Spin}_3$
+Let $G = \mathbb{R}^3 \rtimes \text{Spin}_3$. The Lie algebra $T_0G \cong \mathbb{R}^3 \times \mathfrak{sl}_3$ of $G$ can be used to parameterise updates to $G$-valued parameters, which in our case is the embedding of rigid objects into space.
+
+<!-- Let $((e_x, e_y, e_z), (e_{yz}, e_{zx}, e_{xy}))\in T_0G$. -->
+
+<!-- $\exp: T_0G \to G$ -->
 
 ### Display
 I've used the TorchWindow package [2] to display rendered frames without moving any data off the GPU. 
