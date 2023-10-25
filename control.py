@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 import quaternion as Q
-from rendering.ray_marching import (PinholeCamera, SDFMarcher, SDFNormals, RayGenerator)
+from rendering.ray_marching import (PinholeCamera, SDFMarcher, SDFNormals)
 from rendering.shader import Shader
 
 from pynput import (mouse, keyboard)
@@ -23,19 +23,16 @@ class EventAggregator(nn.Module):
             self, 
             initial_position: list[tuple[float, float, float]] = [(0., 0., 0.)],
             initial_orientation: list[tuple[float, float, float]] = [(1., 0., 0., 0.)],
-            dtype: torch.dtype = _default_dtype
         ):
         super().__init__()
 
-        self.register_buffer('position', torch.tensor(initial_position, dtype=dtype))
-        self.register_buffer('orientation', torch.tensor(initial_orientation, dtype=dtype))
+        self.register_buffer('position', torch.tensor(initial_position))
+        self.register_buffer('orientation', torch.tensor(initial_orientation))
         self.translation_sensitivity = 0.1
         self.rotation_sensitivity = 0.25
 
         self.screen_size = (pyautogui.size().width//2, pyautogui.size().height)
         self.screen_centre = tuple(it//2 for it in self.screen_size)
-
-        self.dtype = dtype
 
         # Initialise state variables:
         self.mouse_state = self.screen_centre
@@ -95,22 +92,22 @@ class EventAggregator(nn.Module):
             'mouse': mouse.Controller()
         }
         self.controllers['mouse'].position = self.screen_centre
-        self.register_buffer('ndc_mouse_diff', torch.tensor((0, 0), dtype=dtype))
+        self.register_buffer('ndc_mouse_diff', torch.tensor((0., 0.)))
 
         self.kb_dict = pd.read_csv(Path() / 'data/keybindings.csv', header=0).set_index('key').T.to_dict()
         self.translations_mappings = nn.ParameterDict({
             key: nn.Parameter(
-                torch.tensor([self.kb_dict[key]['X'], self.kb_dict[key]['Y'], self.kb_dict[key]['Z']], dtype=dtype)
+                torch.tensor([self.kb_dict[key]['X'], self.kb_dict[key]['Y'], self.kb_dict[key]['Z']])
             ) for key in self.kb_dict
         })
         self.orientations_mappings = nn.ParameterDict({
             key: nn.Parameter(
-                torch.tensor([self.kb_dict[key]['YZ'], self.kb_dict[key]['ZX'], self.kb_dict[key]['XY']], dtype=dtype)
+                torch.tensor([self.kb_dict[key]['YZ'], self.kb_dict[key]['ZX'], self.kb_dict[key]['XY']])
             ) for key in self.kb_dict
         })
 
-        self.register_buffer('default_position_input', torch.tensor([[0., 0., 0.]], dtype=dtype))
-        self.register_buffer('default_orientation_input', torch.tensor([[0., 0., 0.]], dtype=dtype))
+        self.register_buffer('default_position_input', torch.tensor([[0., 0., 0.]]))
+        self.register_buffer('default_orientation_input', torch.tensor([[0., 0., 0.]]))
         
 
     def get_state(self):
@@ -197,10 +194,8 @@ class RenderLoop(nn.Module):
         sensor_height: float = 17e-3,
         marching_steps: int = 32,
         normals_eps: float = 5e-2,
-        dtype: torch.dtype = _default_dtype
     ):
         super().__init__()
-        self.dtype = dtype
         self.scene = scene
 
         self.px_width = px_width
@@ -212,21 +207,17 @@ class RenderLoop(nn.Module):
             focal_length=focal_length,
             sensor_width=sensor_width,
             sensor_height=sensor_height,
-            dtype=dtype
         )
         self.marcher = SDFMarcher(
             sdf_scene=self.scene,
-            marching_steps=marching_steps,
         )
         self.normals = SDFNormals(
             sdf_scene=self.scene,
             normals_eps=normals_eps,
-            dtype=dtype
         )
         self.shader = Shader(
             cyclic_cmap=torch.load(Path() / 'data/cyclic_cmap.pt'),
             decay_factor=0.01,
-            dtype=dtype
         )
 
     def forward(

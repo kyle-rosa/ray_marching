@@ -161,11 +161,10 @@ class Shader(nn.Module):
         self,
         cyclic_cmap: Tensor = torch.load(Path() / 'data/cyclic_cmap.pt'),
         decay_factor: float = 0.01,
-        dtype=torch.float,
     ):
         super().__init__()
-        self.register_buffer('cyclic_cmap', cyclic_cmap.clone().to(dtype))
-        self.register_buffer('decay_factor', torch.tensor(decay_factor, dtype=dtype))
+        self.register_buffer('cyclic_cmap', cyclic_cmap.clone())
+        self.register_buffer('decay_factor', torch.tensor(decay_factor))
 
         self.lambertian_shader = LambertianShader()
         self.normal_shader = NormalShader()

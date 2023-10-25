@@ -18,16 +18,16 @@ torch.set_float32_matmul_precision(precision='highest')
 
 if __name__=='__main__':
     device = torch.device('cuda')
-    dtype = torch.float32
+    dtype = torch.float16
 
     px_width = 1_280
     px_height = 720
     px_size = 3.45e-6     
     marching_steps = 32
-    legs = 2
+    legs = 1
 
     # scene = make_test_scene(dtype=dtype)
-    scene = make_test_scene2(dtype=dtype)
+    scene = make_test_scene2().to(device, dtype)
     render_loop = RenderLoop(
         scene=scene,
         num_cameras=1,
@@ -38,12 +38,11 @@ if __name__=='__main__':
         sensor_height=(px_size * px_height),
         marching_steps=marching_steps,
         normals_eps=5e-2,
-        dtype=dtype,
-    ).to(device)
+    ).to(device, dtype)
     render_loop = torch.compile(render_loop)
     # render_loop = torch.compile(render_loop, mode='max-autotune')
 
-    events = EventAggregator(dtype=dtype).to(device)
+    events = EventAggregator().to(device, dtype)
     window = Window(px_width, px_height, "Renderer")
     modes = [
         'lambertian', 'distance', 'proximity',

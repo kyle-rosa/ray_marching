@@ -2,7 +2,7 @@ from .primitives import SDFSpheres, SDFBoxes, SDFPlanes, SDFLine, SDFDisks, SDFT
 from .transformations import SDFOnion, SDFRounding, SDFSmoothUnion, SDFUnion, SDFAffineTransformation
 
 
-def make_test_scene(dtype):
+def make_test_scene():
     return SDFSmoothUnion(
             sdfs=[
                 SDFAffineTransformation(
@@ -11,27 +11,21 @@ def make_test_scene(dtype):
                     sdf=SDFOnion(
                         SDFBoxes(
                             halfsides=[[0.1, 0.2, 0.05], [5., 5., 5.]],
-                            dtype=dtype
                         ),
                         radii=[[0.1], [0.2]],
-                        dtype=dtype,
                     ),
-                    dtype=dtype
                 ),
                 SDFAffineTransformation(
                     orientation=[[1.0, 0.0, 0.0, 0.0]],
                     translation=[[0.0, 0.0, 1.0]],
                     sdf=SDFSpheres(
                         radii=[[0.5]],
-                        dtype=dtype
                     ),
-                    dtype=dtype,
                 ),
                 SDFLine(
                     starts=[[-1., 1., 2.]],
                     ends=[[1., 1., 0.]],
                     radii=[[0.1,]],
-                    dtype=dtype,
                 ),
                 SDFAffineTransformation(
                     orientation=[[0.0, 0.5**0.5, 0.5**0.5, 0.0]],
@@ -39,54 +33,44 @@ def make_test_scene(dtype):
                     sdf=SDFTori(
                         radii1=[[0.5,]], 
                         radii2=[[0.1,]],
-                        dtype=dtype
                     ),
-                    dtype=dtype,
                 ),
             ], 
             blend_k=22.0,
-            dtype=dtype
         )
 
-def make_test_scene2(dtype):
+def make_test_scene2():
     return SDFUnion(
         [
             SDFOnion(
                 SDFBoxes(
                     halfsides=[[5., 5., 5.]],
-                    dtype=dtype
                 ),
                 radii=[[0.1],],
-                dtype=dtype,
             ),
             SDFSmoothUnion(
                 sdfs=[
                     SDFSpheres(
                         radii=[[0.5,], [0.25,]],
-                        dtype=dtype
                     ),
                     SDFTori(
                         radii1=[[1.0,]], 
                         radii2=[[0.25,]],
-                        dtype=dtype
                     ),
                     SDFLine(
                         starts=[[1., 0., 0.,]],
                         ends=[[-1., 0., 0.,]],
                         radii=[[0.1,]],
-                        dtype=dtype,
                     ),
                 ],
                 blend_k=22.0,
-                dtype=dtype
             )
         ],
         keepdim=False
     )
 
-def make_simple_scene(dtype):
+def make_simple_scene():
     return SDFTori(
         radii1=[[0.5,]], 
         radii2=[[0.1,]],
-        dtype=dtype
     )

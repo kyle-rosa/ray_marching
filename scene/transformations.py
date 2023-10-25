@@ -23,12 +23,11 @@ class SDFAffineTransformation(nn.Module):
         sdf: nn.Module,
         orientation: tuple[float, float, float, float],
         translation: tuple[float, float, float],
-        dtype
     ):
         super().__init__()
         self.sdf = sdf
-        self.translation = nn.Parameter(torch.tensor(translation, dtype=dtype))
-        self.orientation = nn.Parameter(torch.tensor(orientation, dtype=dtype))
+        self.translation = nn.Parameter(torch.tensor(translation))
+        self.orientation = nn.Parameter(torch.tensor(orientation))
 
     def forward(
         self, 
@@ -60,11 +59,10 @@ class SDFSmoothUnion(nn.Module):
         self,
         sdfs: nn.Module,
         blend_k: float,
-        dtype
     ):
         super().__init__()
         self.sdfs = nn.ModuleList(sdfs)
-        self.blend_k = nn.Parameter(torch.tensor(blend_k, dtype=dtype))
+        self.blend_k = nn.Parameter(torch.tensor(blend_k))
 
     def forward(
         self,
@@ -124,12 +122,11 @@ class SDFRounding(nn.Module):
         self,
         sdf: nn.Module,
         rounding: float,
-        dtype
 
     ):
         super().__init__()
         self.sdf = sdf
-        self.rounding = nn.Parameter(torch.tensor(rounding, dtype=dtype))
+        self.rounding = nn.Parameter(torch.tensor(rounding))
 
     def forward(
         self,
@@ -143,11 +140,10 @@ class SDFOnion(nn.Module):
         self,
         sdf: nn.Module,
         radii: float,
-        dtype
     ):
         super().__init__()
         self.sdf = sdf
-        self.radii = nn.Parameter(torch.tensor(radii, dtype=dtype))
+        self.radii = nn.Parameter(torch.tensor(radii))
 
     def forward(
         self,
