@@ -238,6 +238,7 @@ class RenderLoop(nn.Module):
         translations: Tensor,
         degree: int = 1,
         marching_steps: int = 32,
+        legs: int = 2
     ):
         # num_rays = 2_000_000
         # points_screen = torch.rand((num_rays, 2), dtype=self.dtype, device=torch.device('cuda')).mul(2).sub(1)
@@ -245,15 +246,53 @@ class RenderLoop(nn.Module):
 
         (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(orientations, translations)
         
-        marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
-        surface_distances = self.scene(marched_ray_pos)
-        (surface_normals, surface_laplacian) = self.normals(marched_ray_pos)
-        images = self.shader(
-            pixel_pos, orientations, pixel_frames, 
-            ray_dirs, marched_ray_pos, 
-            surface_normals, surface_laplacian,
-            surface_distances, degree=degree
-        )
+        # ray_pos_list = [ray_pos.clone()]
+        # ray_dirs_list = [ray_dirs.clone()]
+
+        modes = [
+            'lambertian', 'distance', 'proximity',
+            'vignette', 'normal', 'laplacian',
+            'tangent', 'spin'
+        ]
+        images = {k: torch.zeros_like(ray_pos) for k in modes}
+
+        for leg in range(legs):
+            ray_pos = ray_pos + 0.1 * ray_dirs
+
+            marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
+            ray_pos = marched_ray_pos
+
+            surface_distances = self.scene(marched_ray_pos)
+            (surface_normals, surface_laplacian) = self.normals(marched_ray_pos)
+            
+            new_images = dict(zip(
+                modes, 
+                self.shader(
+                    pixel_pos, orientations, pixel_frames, 
+                    ray_dirs, marched_ray_pos, 
+                    surface_normals, surface_laplacian,
+                    surface_distances, degree=degree
+                )
+            ))
+            for key in new_images:
+                images[key] += new_images[key]
+
+            normal_projections = (
+                surface_normals
+                .mul(ray_dirs.mul(-1))
+                .sum(dim=-1, keepdim=True)
+                .mul(surface_normals)
+            )
+            reflected_dirs = (
+                normal_projections
+                .mul(2)
+                .add(ray_dirs)
+            )
+            ray_dirs = reflected_dirs
+
+
+        for key in images:
+            images[key] = (images[key] / legs).expand(1, -1, -1, 3)
         # images = tuple(image.expand(num_rays, 3) for image in images)
         # images = tuple(
         #     aggregate_rays(
@@ -263,5 +302,5 @@ class RenderLoop(nn.Module):
         #         image,
         #     ) for image in images
         # )
-        images = tuple(image.expand(1, -1, -1, 3) for image in images)
+        # images = tuple(image.expand(1, -1, -1, 3) for image in images)
         return images

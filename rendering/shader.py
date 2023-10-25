@@ -30,6 +30,7 @@ class DistanceShader(nn.Module):
         log_dists = (
             px_coords.sub(surface_coords)
             .norm(dim=-1, p=2, keepdim=True)
+            .clamp(1e-2, float('inf'))
             .log()
         )
         return log_dists.sub(log_dists.min()).div(log_dists.max() - log_dists.min()).pow(1/2.33)
@@ -41,7 +42,7 @@ class ProximityShader(nn.Module):
         super().__init__()
 
     def forward(self, surface_distances):
-        log_dists = surface_distances.clamp(1e-3, float('inf')).log()
+        log_dists = surface_distances.clamp(1e-2, float('inf')).log()
         return log_dists.sub(log_dists.min()).div(log_dists.max() - log_dists.min()).pow(1/2.33)
 
 
@@ -65,9 +66,10 @@ class NormalShader(nn.Module):
     def forward(self, surface_normals):
         return (
             surface_normals
-            .add(1).div(2)
+            .abs()
+            # .add(1).div(2)
             .clamp(0, 1)
-            .pow(1/2.33)
+            # .pow(1/2.33)
         )
 
 
@@ -190,7 +192,6 @@ class Shader(nn.Module):
         camera_orientation_conj = Q.conjugate(
             camera_orientation
         )[..., None, None, :]
-        print(camera_orientation_conj.shape)
         lambertian_layer = self.lambertian_shader(
             ray_directions,
             surface_normals

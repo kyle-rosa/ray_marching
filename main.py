@@ -13,17 +13,18 @@ import torchvision
 from pathlib import Path
 
 
-torch.set_float32_matmul_precision(precision='high')
+torch.set_float32_matmul_precision(precision='highest')
 
 
 if __name__=='__main__':
     device = torch.device('cuda')
-    dtype = torch.float32
+    dtype = torch.float16
 
     px_width = 1_280
     px_height = 720
     px_size = 3.45e-6
-    marching_steps = 64
+    marching_steps = 32
+    legs = 2
 
     scene = make_test_scene(dtype=dtype)
     render_loop = RenderLoop(
@@ -38,7 +39,7 @@ if __name__=='__main__':
         normals_eps=5e-2,
         dtype=dtype,
     ).to(device)
-    # render_loop = torch.compile(render_loop)
+    render_loop = torch.compile(render_loop)
     # render_loop = torch.compile(render_loop, mode='max-autotune')
 
     events = EventAggregator(dtype=dtype).to(device)
@@ -56,15 +57,11 @@ if __name__=='__main__':
         while events.running:
             # optimizer.zero_grad()
             (positions, orientations, mode, degree, marching_steps, save_frame) = events.get_state()
-            images = render_loop(orientations, positions, degree, marching_steps)
-            # images = tuple(image.mean(-2) for image in images)
-            render = images[mode % len(modes)]#.expand(-1, -1, -1, 3)
-            # print(render.shape)
-
-            render = images[0] * images[-1]
+            images = render_loop(orientations, positions, degree, marching_steps, legs)
+            render = images[modes[mode % len(modes)]]
 
             if save_frame:
-                for key, image in zip(modes, images):
+                for key, image in images.items():
                     torchvision.utils.save_image(image.movedim(-1, -3), Path() / f'output/{key}.png')
 
             # loss = images[-1].var().sum()

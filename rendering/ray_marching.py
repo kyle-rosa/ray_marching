@@ -85,6 +85,10 @@ class RayGenerator(nn.Module):
         return (ray_positions, pixel_frames, ray_positions, ray_directions)
 
 
+# def reflection_directions(surface_normals, ray_directions):
+
+
+
 class SDFMarcher(nn.Module):
     def __init__(
         self,
@@ -95,7 +99,7 @@ class SDFMarcher(nn.Module):
         self.sdf_scene = sdf_scene
         self.marching_steps = marching_steps
 
-    def forward(self, ray_positions: Tensor, ray_directions: Tensor, marching_steps) -> Tensor:
+    def forward(self, ray_positions: Tensor, ray_directions: Tensor, marching_steps: int = 32) -> Tensor:
         for _ in range(marching_steps):
             ray_positions = self.sdf_scene(ray_positions).mul(ray_directions).add(ray_positions)
         return ray_positions

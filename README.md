@@ -48,12 +48,12 @@ The space of 3D rotations has a ``hole" in it. Paths through the space of 3D rot
 
 Using quaternions everywhere also allows us to track the spin orientation between objects as they move around the scene. Going further, we can design shaders that actually render objects differently based on their spin orientation relative to the camera.
 
-### Ray Tracing
+### Ray Marching
 #### Sphere Tracing
 Given a signed distance function $f$, we can trace a ray from position $p_0$ in direction $v$ using the formula $$p_{i+1} = p_i + f(p_i) \times v.$$ If the ray intersects the surface described by $f$, then $p_i$ will approach the intersection point on the surface.
 
 #### Reflected Ray Directions
-Consider a ray starting at $p_0$ and travelling in the direction $v_0$, and let $v_{i+1}$ be the direction of travel after $p_i$. If $p_i$ lies on the surface, the outgoing ray will be reflected, otherwise it will continue in the same direction. If $N_i$ is the surface normal at $p_i$, then
+Consider a ray starting at $p_0$ and travelling in the direction $v_0$, and let $v_{i+1}$ be the direction of travel after $p_i$. If $p_i$ lies on the surface the outgoing ray will be reflected, otherwise it will continue in the same direction. If $N_i$ is the surface normal at $p_i$, then
 
 $$
 v_{i+1} = \begin{cases}
@@ -66,6 +66,7 @@ We discuss how to calculate the surface normals $N_i$ from the signed distance f
 
 ### Shaders
 #### Depth Shader
+We can render a depth map by normalising the values of $\log \lvert p_i - p_0 \rvert$ to the interval between $0$ and $1$.
 Brighter pixels represent rays that travelled further from the camera.
 
 <p align="center">
@@ -73,7 +74,8 @@ Brighter pixels represent rays that travelled further from the camera.
 </p>
 
 
-#### Proximity Shader
+#### Surface Proximity Shader
+We can render a *surface proximity* map by normalising the values of $\log f(p_i)$ to the interval between $0$ and $1$.
 Brighter pixels represent rays that terminated further away from a surface.
 
 <p align="center">
