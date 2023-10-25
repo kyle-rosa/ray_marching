@@ -44,9 +44,6 @@ I've implemented a rudimentary constructive geometry system for signed distance 
 #### Quaternions and 3D Rotations
 Wherever possible, I've encoded rotations with unit quaternions. 
 
-<!-- The group of unit quaternions double covers the group of rotations in 3D. Let $\phi:\mathbb{S}^3 \to \text{SO}_3$.  -->
-<!-- We parameterise affine embeddings in space using the group $\mathbb{S}^3\times\mathbb{R}^3$ using  $p^{(q, t)} = p^{\phi(q)} + t.$ -->
-
 The space of 3D rotations has a ``hole" in it. Paths through the space of 3D rotations can become knotted on this hole, which negatively impacts gradient descent algorithms. For example, consider a sequence $R_0, R_1, ..., R_N$ of rotations where $R_0=R_N=I$ and each $R_i^{-1}R_{i+1}$ is small. If the sequence traces out a path around the hole, it will be impossible to continuously deform it into a path that doesn't, such as the path where each $R_i$ is the identity. This phenomenon doesn't occur if the rotations are encoded with quaternions instead.
 
 Using quaternions everywhere also allows us to track the spin orientation between objects as they move around the scene. Going further, we can design shaders that actually render objects differently based on their spin orientation relative to the camera.
@@ -55,35 +52,22 @@ Using quaternions everywhere also allows us to track the spin orientation betwee
 #### Sphere Tracing
 Given a signed distance function $f$, we can trace a ray from position $p_0$ in direction $v$ using the formula $$p_{i+1} = p_i + f(p_i) \times v.$$ If the ray intersects the surface described by $f$, then $p_i$ will approach the intersection point on the surface.
 
-#### Surface Normal Calculation
-Once we've found a ray-surface intersection point $p$, we can calculate the surface normal vector $N_p$ at $p$ by querying the SDF at nearby points and estimating the gradient numerically:
-$N_p = (\nabla f)(p)$. 
-
-Concretely, for $i=0, 1, 2, 3$ let $v_i$ be the vertices of a regualar tetrahedron centred at $0$. We estimate the derivative of $f$ in the direction of $v_i - v_0$ using $$(\nabla f)(p)\centerdot( \epsilon v_i -  \epsilon v_0) \approx f(p + \epsilon v_i) - f(p + \epsilon v_0),$$
-where $\epsilon$ is a small constant. As know the values of $p$, each $v_i$, and each $f(p+\epsilon v_i)$ this gives us $3$ equations in $3$ unknowns at every point $p$, which allows the gradient to be found by solving a simple linear system. As a curiosity, it's also possible to find the surface normal vector by back-propagating the value of $f(p)$ and inspecting the gradient of $p$. This is more commputationally intensive, but also more numerically accurate.
-
 #### Reflected Ray Directions
-Consider a ray starting at $p_0$ and traveling along direction $v_j$. If $f(p_{i}) \approx 0$ then $p_i$ lies on the surface, and we can calculate the outgoing direction $v_{j+1}$ of the reflected ray using
+Consider a ray starting at $p_0$ and travelling in the direction $v_0$, and let $v_{i+1}$ be the direction of travel after $p_i$. If $p_i$ lies on the surface, the outgoing ray will be reflected, otherwise it will continue in the same direction. If $N_i$ is the surface normal at $p_i$, then
 
-$$ v_{j+1} = v_j - 2(v_j\centerdot N_i)N_i,$$
+$$
+v_{i+1} = \begin{cases}
+  v_i - 2(v_i\centerdot N_i)N_i & \text{if } f(p_{i}) \approx 0,\\
+  v_i  & \text{otherwise.}
+\end{cases}
+$$
 
-where $N_i = \nabla f(p_i)$.
-
-#### Surface Laplacian Calculation
-The Laplacian represents the difference between $f(p)$ and the average value of $f$ over a small sphere centred on $p$. 
-We can reuse the values of $f(p+\epsilon v_i)$ that we calculated to find $\nabla f$ to numerically estimate the Laplacian $\Delta f$ of $f$.
-Explicitly, for a function $f: \mathbb{R}^n\to\mathbb{R}$ the average value $\overline{f}(p, h)$ of $f$ over a sphere of radius $h$ centred at $p$ is given by
-$$\overline{f}(p, h) \approx f(p) - \frac{(\Delta f)(p)}{2n}h^2,$$
-where we adopt the positive-definite sign convention for $\Delta$. Then, using $$\overline{f}(p, \epsilon)  \approx \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i),$$
-we get 
-$$(\Delta f)(p) \approx \frac{2n}{\epsilon^2} \left( f(p) - \overline{f}(p, \epsilon) \right)$$
-$$\approx \frac{6}{\epsilon^2} \left( f(p) - \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i) \right).$$
-
-
+We discuss how to calculate the surface normals $N_i$ from the signed distance function $f$ below.
 
 ### Shaders
 #### Depth Shader
 Brighter pixels represent rays that travelled further from the camera.
+
 <p align="center">
   <img src="gallery/distance.png?raw=true" width="600"> 
 </p>
@@ -91,6 +75,7 @@ Brighter pixels represent rays that travelled further from the camera.
 
 #### Proximity Shader
 Brighter pixels represent rays that terminated further away from a surface.
+
 <p align="center">
   <img src="gallery/proximity.png?raw=true" width="600"> 
 </p>
@@ -101,26 +86,46 @@ Vignetting is a consequence of projecting onto a flat plane, and causes pixels n
 1. Pixels further to the edge of the image aren't oriented to point directly at the focal point. 
 2. Pixels further to the edge of the image are further away from the focal point, so the flux density of incoming photons is reduced by an inverse-square law.
 
-For a pixel $p$ with unit normal $n_p$, and letting $v_p$ be a unit vector from the pixel $p$ to the focal point, we can express the impact of the pixel orientation with a factor of $(v_p \centerdot n_p )$. Let $f$ be the focal distance and $r_p$ is the radial distance between the pixel $p$ and the line of focus. Then the total reduction in the number of incident photons is by a factor of $$\frac{f^2}{f^2+r_p^2}(v_p \centerdot n_p)=(\cos \theta)^3=(v_p \centerdot n_p)^3.$$ 
+For a pixel $p$ with unit normal $n_p$, and letting $v_p$ be a unit vector from the pixel $p$ to the focal point, we can express the impact of the pixel orientation with a factor of $(v_p \centerdot n_p )$. Let $f$ be the focal distance and $r_p$ is the radial distance between the pixel $p$ and the line of focus. Then the total reduction in the number of incident photons is by a factor of 
+
+$$\frac{f^2}{f^2+r_p^2}(v_p \centerdot n_p)=(\cos \theta)^3=(v_p \centerdot n_p)^3.$$ 
+
 <p align="center">
   <img src="gallery/vignette.png?raw=true" width="600"> 
 </p>
 
-
-
-
-<!-- If $n_p$ is the unit normal vector of the pixel, and $v_p$ is a unit vector pointing from the pixel centre to the focal point, then the intensity $I_p$ at $p$ will be scaled by 
-
-$$I_p = (v_p \centerdot n_p)$$
-$$ = (\cos \theta)^2(\cos \theta)$$ -->
-
 #### Surface Normals
+Once we've found a ray-surface intersection point $p$, we can calculate the surface normal vector $N_p$ at $p$ by querying the SDF at nearby points and estimating the gradient numerically:
+$N_p = (\nabla f)(p)$. 
+
+Concretely, for $i=0, 1, 2, 3$ let $v_i$ be the vertices of a regualar tetrahedron centred at $0$. We estimate the derivative of $f$ in the direction of $v_i - v_0$ using 
+
+$$(\nabla f)(p)\centerdot( \epsilon v_i -  \epsilon v_0) \approx f(p + \epsilon v_i) - f(p + \epsilon v_0),$$
+
+where $\epsilon$ is a small constant. As know the values of $p$, each $v_i$, and each $f(p+\epsilon v_i)$ this gives us $3$ equations in $3$ unknowns at every point $p$, which allows the gradient to be found by solving a simple linear system. As a curiosity, it's also possible to find the surface normal vector by back-propagating the value of $f(p)$ and inspecting the gradient of $p$. This is more commputationally intensive, but also more numerically accurate.
+
 The Surface Normal shader colours pixels based on the coordinates of the surface normal vectors. To generate the image below, I translated surface normals $N_p = (x, y, z)$ to RGB values using $(\lvert x \rvert , \lvert y \rvert, \lvert z \rvert)$.
+
 <p align="center">
   <img src="gallery/normal.png?raw=true" width="600"> 
 </p>
 
 #### Surface Laplacian
+The Laplacian represents the difference between $f(p)$ and the average value of $f$ over a small sphere centred on $p$. 
+We can reuse the values of $f(p+\epsilon v_i)$ that we calculated to find $\nabla f$ to numerically estimate the Laplacian $\Delta f$ of $f$.
+Explicitly, for a function $f: \mathbb{R}^n\to\mathbb{R}$ the average value $\overline{f}(p, h)$ of $f$ over a sphere of radius $h$ centred at $p$ is given by
+$$\overline{f}(p, h) \approx f(p) - \frac{(\Delta f)(p)}{2n}h^2,$$
+where we adopt the positive-definite sign convention for $\Delta$. Then, using 
+
+$$\overline{f}(p, \epsilon)  \approx \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i),$$
+
+we get 
+
+$$(\Delta f)(p) \approx \frac{2n}{\epsilon^2} \left( f(p) - \overline{f}(p, \epsilon) \right)$$
+
+$$\approx \frac{6}{\epsilon^2} \left( f(p) - \frac{1}{4}\sum_{i=0}^3f(p+\epsilon v_i) \right).$$
+
+
 Using the method described above, we calculate the Laplacian $L_p = (\Delta f)(p_i)$ at the terminal location of each pixel's ray, and visualise the resulting scalar field by normalising the values between $0$ and $1$. The image below has also been gamma corrected to improve perceptual uniformity.
 
 <p align="center">
@@ -130,6 +135,7 @@ Using the method described above, we calculate the Laplacian $L_p = (\Delta f)(p
 
 #### Lambertian Shader
 Very simple geometric illumination model. Intensity $I_p$ is proportional to the cosine between the ray direction $v_p$ and the surface normal $N_p \approx (\nabla f)_p$. Symbolically, $I_p = v_p \centerdot N_p$. 
+
 <p align="center">
   <img src="gallery/lambertian.png?raw=true" width="600"> 
 </p>
@@ -170,8 +176,6 @@ $$ \mathbb{S}^3\times\mathbb{S}^2 \to \mathbb{S}^3 \to \mathbb{S}^1 \to \mathbb{
 
 ### User Input and Camera Control
 We use Pynput to process mouse and keyboard inputs.
-<!-- These are compiled into updates for the  -->
-<!-- These are compiled into an affine transformations that are used to update the camera position and orientation each frame.  -->
 
 The user can control the camera position and orientation, as well as the settings for a couple of rendering options. Each frame, we need to perform the following steps:
 1. Query the mouse and keyboard inputs.
@@ -185,10 +189,6 @@ Let $X$ be a set of parameters that transform under the action of a Lie group $G
 The advantage of working in the Lie algebra $\mathfrak{g}$ is that we can linearly combine the updates using vector addition before mapping the result into $G$ and applying the result to our state parameters. The alternative would involve mapping multiple elements of $\mathfrak{g}$ into $G$ before applying them to the state parameters in sequence, which is more computationally intense and has worse numeric properties.
 
 In our application, $X = G \cong \mathbb{R}^3 \rtimes \text{Spin}_3$ is the set of embeddings into 3D space, and the Lie algebra is $\mathfrak{g} \cong \mathbb{R}^3 \times \mathfrak{sl}_3$. 
-
-<!-- Let $((e_x, e_y, e_z), (e_{yz}, e_{zx}, e_{xy}))\in \mathfrak{g}$.  -->
-
-<!-- $\exp: T_0G \to G$ -->
 
 ### Display
 I've used the TorchWindow package [2] to display rendered frames without moving any data off the GPU. 
