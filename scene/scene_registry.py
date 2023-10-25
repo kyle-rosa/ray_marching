@@ -48,6 +48,42 @@ def make_test_scene(dtype):
             dtype=dtype
         )
 
+def make_test_scene2(dtype):
+    return SDFUnion(
+        [
+            SDFOnion(
+                SDFBoxes(
+                    halfsides=[[5., 5., 5.]],
+                    dtype=dtype
+                ),
+                radii=[[0.1],],
+                dtype=dtype,
+            ),
+            SDFSmoothUnion(
+                sdfs=[
+                    SDFSpheres(
+                        radii=[[0.5,], [0.25,]],
+                        dtype=dtype
+                    ),
+                    SDFTori(
+                        radii1=[[1.0,]], 
+                        radii2=[[0.25,]],
+                        dtype=dtype
+                    ),
+                    SDFLine(
+                        starts=[[1., 0., 0.,]],
+                        ends=[[-1., 0., 0.,]],
+                        radii=[[0.1,]],
+                        dtype=dtype,
+                    ),
+                ],
+                blend_k=22.0,
+                dtype=dtype
+            )
+        ],
+        keepdim=False
+    )
+
 def make_simple_scene(dtype):
     return SDFTori(
         radii1=[[0.5,]], 

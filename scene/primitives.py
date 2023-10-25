@@ -9,7 +9,7 @@ class SDFSpheres(nn.Module):
 
     def forward(self, query_positions):
         return (
-            query_positions
+            query_positions[..., None, :]
             .norm(dim=-1, p=2, keepdim=True)
             .sub(self.radii)
         )
@@ -21,7 +21,7 @@ class SDFBoxes(nn.Module):
         self.halfsides = nn.Parameter(torch.tensor(halfsides, dtype=dtype))
 
     def forward(self, query_positions):
-        q = query_positions.abs().sub(self.halfsides)
+        q = query_positions[..., None, :].abs().sub(self.halfsides)
         q_max = q.max(dim=-1, keepdim=True).values
         return (
             q.where(q > 0., 0.)
@@ -35,7 +35,7 @@ class SDFPlanes(nn.Module):
         super().__init__()
 
     def forward(self, query_positions):
-        return query_positions[..., [0]]
+        return query_positions[..., [0]][..., None, :]
 
 
 class SDFLine(nn.Module):
@@ -51,6 +51,7 @@ class SDFLine(nn.Module):
         AB_div_length2 = AB.div(length2)
 
         AP = query_positions[..., None, :].sub(self.starts)
+        # print([it.shape for it in [query_positions, AB, AP]])
         return (
             AP.mul(AB_div_length2).sum(dim=-1, keepdim=True).clamp(0.0, 1.0)
             .mul(AB).sub(AP)
@@ -84,7 +85,7 @@ class SDFTori(nn.Module):
     def forward(self, query_positions):
         return torch.cat(
             [
-                query_positions[..., [0, 2]].norm(dim=-1, p=2, keepdim=True).sub(self.radii1),
-                query_positions[..., [1]],
+                query_positions[..., [0, 2]].norm(dim=-1, p=2, keepdim=True)[..., None, :].sub(self.radii1),
+                query_positions[..., [1]][..., None, :],
             ], dim=-1
         ).norm(dim=-1, p=2, keepdim=True).subtract(self.radii2)

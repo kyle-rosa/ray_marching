@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from control import EventAggregator, RenderLoop
-from scene.scene_registry import make_simple_scene, make_test_scene
+from scene.scene_registry import make_test_scene, make_test_scene2
 
 from torchwindow import Window
 import torchvision
@@ -18,15 +18,16 @@ torch.set_float32_matmul_precision(precision='highest')
 
 if __name__=='__main__':
     device = torch.device('cuda')
-    dtype = torch.float16
+    dtype = torch.float32
 
     px_width = 1_280
     px_height = 720
-    px_size = 3.45e-6
+    px_size = 3.45e-6     
     marching_steps = 32
     legs = 2
 
-    scene = make_test_scene(dtype=dtype)
+    # scene = make_test_scene(dtype=dtype)
+    scene = make_test_scene2(dtype=dtype)
     render_loop = RenderLoop(
         scene=scene,
         num_cameras=1,

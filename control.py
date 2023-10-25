@@ -214,9 +214,6 @@ class RenderLoop(nn.Module):
             sensor_height=sensor_height,
             dtype=dtype
         )
-        # self.camera = RayGenerator(
-        #     focal_length, sensor_width, sensor_height
-        # )
         self.marcher = SDFMarcher(
             sdf_scene=self.scene,
             marching_steps=marching_steps,
@@ -240,15 +237,8 @@ class RenderLoop(nn.Module):
         marching_steps: int = 32,
         legs: int = 2
     ):
-        # num_rays = 2_000_000
-        # points_screen = torch.rand((num_rays, 2), dtype=self.dtype, device=torch.device('cuda')).mul(2).sub(1)
-        # (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(points_screen, orientations, translations)
-
         (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(orientations, translations)
         
-        # ray_pos_list = [ray_pos.clone()]
-        # ray_dirs_list = [ray_dirs.clone()]
-
         modes = [
             'lambertian', 'distance', 'proximity',
             'vignette', 'normal', 'laplacian',
@@ -260,8 +250,6 @@ class RenderLoop(nn.Module):
             ray_pos = ray_pos + 0.1 * ray_dirs
 
             marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
-            ray_pos = marched_ray_pos
-
             surface_distances = self.scene(marched_ray_pos)
             (surface_normals, surface_laplacian) = self.normals(marched_ray_pos)
             
@@ -288,19 +276,12 @@ class RenderLoop(nn.Module):
                 .mul(2)
                 .add(ray_dirs)
             )
+
+            ray_pos = marched_ray_pos
             ray_dirs = reflected_dirs
 
 
         for key in images:
             images[key] = (images[key] / legs).expand(1, -1, -1, 3)
-        # images = tuple(image.expand(num_rays, 3) for image in images)
-        # images = tuple(
-        #     aggregate_rays(
-        #         self.px_width,
-        #         self.px_height,
-        #         points_screen,
-        #         image,
-        #     ) for image in images
-        # )
-        # images = tuple(image.expand(1, -1, -1, 3) for image in images)
+        
         return images

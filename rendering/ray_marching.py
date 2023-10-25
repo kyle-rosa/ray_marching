@@ -101,6 +101,7 @@ class SDFMarcher(nn.Module):
 
     def forward(self, ray_positions: Tensor, ray_directions: Tensor, marching_steps: int = 32) -> Tensor:
         for _ in range(marching_steps):
+            # print(dists.shape)
             ray_positions = self.sdf_scene(ray_positions).mul(ray_directions).add(ray_positions)
         return ray_positions
 

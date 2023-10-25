@@ -70,9 +70,10 @@ class SDFSmoothUnion(nn.Module):
         self,
         query_coords: Tensor
     ) -> Tensor:
+        # print([it.shape for it in [sdf(query_coords) for sdf in self.sdfs]])
         return (
             torch.cat([sdf(query_coords) for sdf in self.sdfs], dim=-2)
-            .mul(-self.blend_k).logsumexp(dim=-2).div(-self.blend_k)
+            .mul(-self.blend_k).logsumexp(dim=-2, keepdim=True).div(-self.blend_k)
         )
 
 
@@ -90,17 +91,20 @@ class SDFUnion(nn.Module):
     def __init__(
         self,
         sdfs: list[nn.Module],
+        keepdim=True
     ):
         super().__init__()
         self.sdfs = nn.ModuleList(sdfs)
+        self.keepdim = keepdim
 
     def forward(
         self,
         query_coords: Tensor
     ) -> Tensor:
+        # print([it.shape for it in [sdf(query_coords) for sdf in self.sdfs]])
         return (
             torch.cat([sdf(query_coords) for sdf in self.sdfs], dim=-2)
-            .min(dim=-2).values
+            .min(dim=-2, keepdim=self.keepdim).values
         )
 
     
