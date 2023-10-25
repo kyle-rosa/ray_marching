@@ -29,14 +29,10 @@ class SDFAffineTransformation(nn.Module):
         self.translation = nn.Parameter(torch.tensor(translation))
         self.orientation = nn.Parameter(torch.tensor(orientation))
 
-    def forward(
-        self, 
-        query_positions: Tensor
-    ) -> Tensor:
-        
+    def forward(self, query_positions: Tensor) -> Tensor:
         return self.sdf(
             Q.rotation(
-                query_positions[..., None, :].sub(self.translation), 
+                query_positions.sub(self.translation), 
                 Q.conjugate(self.orientation)
             )
         )
@@ -64,14 +60,10 @@ class SDFSmoothUnion(nn.Module):
         self.sdfs = nn.ModuleList(sdfs)
         self.blend_k = nn.Parameter(torch.tensor(blend_k))
 
-    def forward(
-        self,
-        query_coords: Tensor
-    ) -> Tensor:
-        # print([it.shape for it in [sdf(query_coords) for sdf in self.sdfs]])
+    def forward(self, query_coords: Tensor) -> Tensor:
         return (
-            torch.cat([sdf(query_coords) for sdf in self.sdfs], dim=-2)
-            .mul(-self.blend_k).logsumexp(dim=-2, keepdim=True).div(-self.blend_k)
+            torch.stack([sdf(query_coords) for sdf in self.sdfs], dim=-2)
+            .mul(-self.blend_k).logsumexp(dim=-2).div(-self.blend_k)
         )
 
 
@@ -89,20 +81,14 @@ class SDFUnion(nn.Module):
     def __init__(
         self,
         sdfs: list[nn.Module],
-        keepdim=True
     ):
         super().__init__()
         self.sdfs = nn.ModuleList(sdfs)
-        self.keepdim = keepdim
 
-    def forward(
-        self,
-        query_coords: Tensor
-    ) -> Tensor:
-        # print([it.shape for it in [sdf(query_coords) for sdf in self.sdfs]])
+    def forward(self,query_coords: Tensor) -> Tensor:
         return (
-            torch.cat([sdf(query_coords) for sdf in self.sdfs], dim=-2)
-            .min(dim=-2, keepdim=self.keepdim).values
+            torch.stack([sdf(query_coords) for sdf in self.sdfs], dim=-2)
+            .min(dim=-2).values
         )
 
     
@@ -122,16 +108,12 @@ class SDFRounding(nn.Module):
         self,
         sdf: nn.Module,
         rounding: float,
-
     ):
         super().__init__()
         self.sdf = sdf
         self.rounding = nn.Parameter(torch.tensor(rounding))
 
-    def forward(
-        self,
-        query_coords: Tensor
-    ) -> Tensor:
+    def forward(self, query_coords: Tensor) -> Tensor:
         return self.sdf(query_coords).subtract(self.rounding)
 
 
@@ -145,10 +127,7 @@ class SDFOnion(nn.Module):
         self.sdf = sdf
         self.radii = nn.Parameter(torch.tensor(radii))
 
-    def forward(
-        self,
-        query_coords: Tensor
-    ) -> Tensor:
+    def forward(self, query_coords: Tensor) -> Tensor:
         return self.sdf(query_coords).abs().sub(self.radii)
 
 

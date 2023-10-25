@@ -44,29 +44,28 @@ def make_test_scene2():
         [
             SDFOnion(
                 SDFBoxes(
-                    halfsides=[[5., 5., 5.]],
+                    halfsides=[5., 5., 5.],
                 ),
-                radii=[[0.1],],
+                radii=[0.1],
             ),
             SDFSmoothUnion(
                 sdfs=[
                     SDFSpheres(
-                        radii=[[0.5,], [0.25,]],
+                        radii=[0.5,],
                     ),
                     SDFTori(
-                        radii1=[[1.0,]], 
-                        radii2=[[0.25,]],
+                        radii1=[1.0,], 
+                        radii2=[0.25,],
                     ),
                     SDFLine(
-                        starts=[[1., 0., 0.,]],
-                        ends=[[-1., 0., 0.,]],
-                        radii=[[0.1,]],
+                        starts=[1., 0., 0.,],
+                        ends=[-1., 0., 0.,],
+                        radii=[0.1,],
                     ),
                 ],
                 blend_k=22.0,
             )
         ],
-        keepdim=False
     )
 
 def make_simple_scene():

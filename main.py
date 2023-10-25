@@ -39,7 +39,7 @@ if __name__=='__main__':
         marching_steps=marching_steps,
         normals_eps=5e-2,
     ).to(device, dtype)
-    render_loop = torch.compile(render_loop)
+    # render_loop = torch.compile(render_loop)
     # render_loop = torch.compile(render_loop, mode='max-autotune')
 
     events = EventAggregator().to(device, dtype)
