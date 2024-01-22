@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from control import EventAggregator, RenderLoop
-from scene.scene_registry import make_test_scene, make_test_scene2
+from scene.scene_registry import make_test_scene2
 
 from torchwindow import Window
 import torchvision
@@ -18,12 +18,12 @@ torch.set_float32_matmul_precision(precision='highest')
 
 if __name__=='__main__':
     device = torch.device('cuda')
-    dtype = torch.float16
+    dtype = torch.float32
 
-    px_width = 1_280
-    px_height = 720
+    px_width = 1_280 // 2
+    px_height = 720 // 2
     px_size = 3.45e-6     
-    marching_steps = 32
+    marching_steps = 16
     legs = 1
 
     # scene = make_test_scene(dtype=dtype)
@@ -36,7 +36,6 @@ if __name__=='__main__':
         focal_length=(px_size * px_height),
         sensor_width=(px_size * px_width),
         sensor_height=(px_size * px_height),
-        marching_steps=marching_steps,
         normals_eps=5e-2,
     ).to(device, dtype)
     # render_loop = torch.compile(render_loop)
@@ -62,7 +61,10 @@ if __name__=='__main__':
 
             if save_frame:
                 for key, image in images.items():
-                    torchvision.utils.save_image(image.movedim(-1, -3), Path() / f'output/{key}.png')
+                    torchvision.utils.save_image(
+                        image.movedim(-1, -3), 
+                        Path() / f'output/{key}.png'
+                    )
 
             # loss = images[-1].var().sum()
             # loss.backward()

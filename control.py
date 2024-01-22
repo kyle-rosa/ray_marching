@@ -15,9 +15,6 @@ from pynput import (mouse, keyboard)
 from collections import defaultdict
 
 
-_default_device = torch.device('cpu')
-_default_dtype = torch.float32
-
 class EventAggregator(nn.Module):
     def __init__(
             self, 
@@ -149,7 +146,14 @@ class EventAggregator(nn.Module):
 
         save_frame = self.save_frame
         self.save_frame = False
-        return (self.position, self.orientation, self.mode, self.degree, self.marching_steps, save_frame)
+        return (
+            self.position,
+            self.orientation,
+            self.mode,
+            self.degree,
+            self.marching_steps,
+            save_frame
+        )
 
 
 def aggregate_rays(
@@ -182,6 +186,24 @@ def aggregate_rays(
         return numer.div(denom).where(denom!=0, 0.).view(shape)
 
 
+def make_reflection_directions(
+    surface_normals: Tensor,
+    ray_dirs: Tensor,
+):
+    normal_projections = (
+        surface_normals
+        .mul(ray_dirs.mul(-1))
+        .sum(dim=-1, keepdim=True)
+        .mul(surface_normals)
+    )
+    reflected_dirs = (
+        normal_projections
+        .mul(2)
+        .add(ray_dirs)
+    )
+    return reflected_dirs
+
+
 class RenderLoop(nn.Module):
     def __init__(
         self,
@@ -192,7 +214,6 @@ class RenderLoop(nn.Module):
         focal_length: float = 17e-3,
         sensor_width: float = 17e-3,
         sensor_height: float = 17e-3,
-        marching_steps: int = 32,
         normals_eps: float = 5e-2,
     ):
         super().__init__()
@@ -217,7 +238,6 @@ class RenderLoop(nn.Module):
         )
         self.shader = Shader(
             cyclic_cmap=torch.load(Path() / 'data/cyclic_cmap.pt'),
-            decay_factor=0.01,
         )
 
     def forward(
@@ -237,7 +257,13 @@ class RenderLoop(nn.Module):
         ]
         images = {k: torch.zeros_like(ray_pos) for k in modes}
 
+
+        ray_positions = []
+        ray_directions = []
+        cum_leg_length = torch.zeros_like(ray_pos[..., [0]])
         for leg in range(legs):
+            ray_positions.append(ray_pos.clone())
+            ray_directions.append(ray_dirs.clone())
             ray_pos = ray_pos + 0.1 * ray_dirs
 
             marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
@@ -253,23 +279,17 @@ class RenderLoop(nn.Module):
                     surface_distances, degree=degree
                 )
             ))
+            # leg_length = (marched_ray_pos - ray_pos).pow(2).sum(dim=-1, keepdim=True).pow(1/2)
+            # cum_leg_length = cum_leg_length + leg_length
             for key in new_images:
-                images[key] += new_images[key]
+                images[key] += new_images[key] #* cum_leg_length.pow(-2)
 
-            normal_projections = (
-                surface_normals
-                .mul(ray_dirs.mul(-1))
-                .sum(dim=-1, keepdim=True)
-                .mul(surface_normals)
-            )
-            reflected_dirs = (
-                normal_projections
-                .mul(2)
-                .add(ray_dirs)
-            )
+            reflected_dirs = make_reflection_directions(surface_normals, ray_dirs)
+
 
             ray_pos = marched_ray_pos
             ray_dirs = reflected_dirs
+
 
 
         for key in images:

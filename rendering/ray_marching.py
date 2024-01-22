@@ -85,10 +85,7 @@ class PinholeCamera(nn.Module):
 
 
 class SDFMarcher(nn.Module):
-    def __init__(
-        self,
-        sdf_scene: nn.Module,
-    ):
+    def __init__(self, sdf_scene: nn.Module):
         super().__init__()
         self.sdf_scene = sdf_scene
 
@@ -131,7 +128,6 @@ class SDFNormals(nn.Module):
         )
         self.register_buffer('offsets_inverse', self.relative_offsets.inverse())
 
-        
     def forward(self, surface_coords):
         offset_values = self.sdf_scene(surface_coords[..., None, :].add(self.offsets))
         d_values = offset_values[..., [1, 2, 3], :].sub(offset_values[..., [0], :])

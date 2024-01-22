@@ -9,7 +9,6 @@ from torch import Tensor
 import quaternion as Q
 
 
-# Lambertian Shader
 class LambertianShader(nn.Module):
     def __init__(self):
         super().__init__()
@@ -17,36 +16,45 @@ class LambertianShader(nn.Module):
     def forward(self, ray_directions, surface_normals):
         return (
             ray_directions.mul(surface_normals)
-            .sum(dim=-1).neg().clamp(0, 1)[..., None]
+            .sum(dim=-1, keepdim=True).neg().clamp(0, 1)
         )
 
 
-# Distance Shader
 class DistanceShader(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, px_coords, surface_coords, decay_factor):
+    def forward(self, px_coords, surface_coords):
         log_dists = (
             px_coords.sub(surface_coords)
             .norm(dim=-1, p=2, keepdim=True)
             .clamp(1e-2, float('inf'))
             .log()
         )
-        return log_dists.sub(log_dists.min()).div(log_dists.max() - log_dists.min()).pow(1/2.33)
+        return (
+            log_dists.sub(log_dists.min())
+            .div(log_dists.max().sub(log_dists.min()))
+            .pow(1 / 2.33)
+        )
 
 
-# Proximity Shader
 class ProximityShader(nn.Module):
     def __init__(self):
         super().__init__()
 
     def forward(self, surface_distances):
-        log_dists = surface_distances.clamp(1e-2, float('inf')).log()
-        return log_dists.sub(log_dists.min()).div(log_dists.max() - log_dists.min()).pow(1/2.33)
+        log_dists = (
+            surface_distances
+            .clamp(1e-2, float('inf'))
+            .log()
+        )
+        return (
+            log_dists.sub(log_dists.min())
+            .div(log_dists.max().sub(log_dists.min()))
+            .pow(1 / 2.33)
+        )
 
 
-# Vignette Shader
 class VignetteShader(nn.Module):
     def __init__(self):
         super().__init__()
@@ -58,7 +66,6 @@ class VignetteShader(nn.Module):
         )
 
 
-# Normals Shader
 class NormalShader(nn.Module):
     def __init__(self):
         super().__init__()
@@ -67,13 +74,10 @@ class NormalShader(nn.Module):
         return (
             surface_normals
             .abs()
-            # .add(1).div(2)
             .clamp(0, 1)
-            # .pow(1/2.33)
         )
 
 
-# Laplacian Shader
 class LaplacianShader(nn.Module):
     def __init__(self):
         super().__init__()
@@ -89,7 +93,6 @@ class LaplacianShader(nn.Module):
         )
 
 
-# Tangents Shader
 def angle_colouring(real_part, imag_part, cyclic_colourmap, degree):
     cmap_index = (
         torch.atan2(imag_part, real_part)
@@ -99,11 +102,13 @@ def angle_colouring(real_part, imag_part, cyclic_colourmap, degree):
     )
     return cyclic_colourmap[cmap_index, :]
 
+
 def domain_colouring(real_part, imag_part, cyclic_colourmap, degree=1):
     return (
         angle_colouring(real_part, imag_part, cyclic_colourmap, degree)
         .multiply((real_part.pow(2).add(imag_part.pow(2))).pow(0.5)[..., None])
     )
+
 
 class TangentShader(nn.Module):
     def __init__(self,):
@@ -111,11 +116,11 @@ class TangentShader(nn.Module):
 
     def forward(
             self,
-            camera_orientation_conj,
-            ray_directions,
-            surface_normals,
-            cyclic_colourmap,
-            degree
+            camera_orientation_conj: Tensor,
+            ray_directions: Tensor,
+            surface_normals: Tensor,
+            cyclic_colourmap: Tensor,
+            degree: int = 1
         ):
         projected_normals = Q.rotation(
             (
@@ -133,17 +138,16 @@ class TangentShader(nn.Module):
         return domain_colouring(real_part, imag_part, cyclic_colourmap, degree)
 
 
-# Spin Shader
 class SpinShader(nn.Module):
-    def __init__(self, ):
+    def __init__(self):
         super().__init__()
 
     def forward(
             self,
-            camera_orientation_conj,
-            surface_normals,
-            cyclic_colourmap,
-            degree
+            camera_orientation_conj: Tensor,
+            surface_normals: Tensor,
+            cyclic_colourmap: Tensor,
+            degree: int = 1
         ):
         value = Q.multiply(
             F.pad(surface_normals, [1, 0], value=0.),
@@ -155,16 +159,13 @@ class SpinShader(nn.Module):
         return domain_colouring(real_part, imag_part, cyclic_colourmap, degree)
 
 
-# All Shaders
 class Shader(nn.Module):
     def __init__(
         self,
         cyclic_cmap: Tensor = torch.load(Path() / 'data/cyclic_cmap.pt'),
-        decay_factor: float = 0.01,
     ):
         super().__init__()
         self.register_buffer('cyclic_cmap', cyclic_cmap.clone())
-        self.register_buffer('decay_factor', torch.tensor(decay_factor))
 
         self.lambertian_shader = LambertianShader()
         self.normal_shader = NormalShader()
@@ -198,7 +199,6 @@ class Shader(nn.Module):
         distance_layer = self.distance_shader(
             px_coords,
             surface_coords,
-            self.decay_factor
         )
         proximity_layer = self.proximity_shader(
             surface_distances
@@ -227,6 +227,12 @@ class Shader(nn.Module):
             degree
         )
 
+        # lambertian_layer = (
+        #     surface_coords.add(1/20).remainder(0.1).sub(1/20).pow(2)
+        #     .max(dim=-1, keepdim=True).values
+        #     .mul(-10000).exp()
+        # )
+
         return (
             lambertian_layer,
             distance_layer,
@@ -239,31 +245,31 @@ class Shader(nn.Module):
         )
 
 
-def aggregate_rays(
-        px_width,
-        px_height,
-        points_screen,
-        ray_features,
-    ):
-        shape = (px_height, px_width, ray_features.shape[-1])
-        points_screen_idx = torch.stack(
-            [ 
-                points_screen[..., 0].add(1).div(2).mul(px_width).trunc().long().clamp(0, px_width-1),
-                points_screen[..., 1].mul(-1).add(1).div(2).mul(px_height).trunc().long().clamp(0, px_height-1)
-            ], dim=-1
-        )
-        points_screen_idx_linear = (
-            points_screen_idx[..., 1] * px_width
-            + points_screen_idx[..., 0]
-        )
-        numer = (
-            torch.zeros(shape, dtype=ray_features.dtype, device=ray_features.device)
-            .view((px_height * px_width), ray_features.shape[-1])
-            .index_add(dim=0, index=points_screen_idx_linear, source=ray_features)
-        )
-        denom = (
-            torch.zeros(shape, dtype=ray_features.dtype, device=ray_features.device)
-            .view(px_height * px_width, ray_features.shape[-1])
-            .index_add(dim=0, index=points_screen_idx_linear, source=torch.ones_like(ray_features))
-        )
-        return numer.div(denom).where(denom!=0, 0.).view(shape)
+# def aggregate_rays(
+#         px_width,
+#         px_height,
+#         points_screen,
+#         ray_features,
+#     ):
+#         shape = (px_height, px_width, ray_features.shape[-1])
+#         points_screen_idx = torch.stack(
+#             [ 
+#                 points_screen[..., 0].add(1).div(2).mul(px_width).trunc().long().clamp(0, px_width-1),
+#                 points_screen[..., 1].mul(-1).add(1).div(2).mul(px_height).trunc().long().clamp(0, px_height-1)
+#             ], dim=-1
+#         )
+#         points_screen_idx_linear = (
+#             points_screen_idx[..., 1] * px_width
+#             + points_screen_idx[..., 0]
+#         )
+#         numer = (
+#             torch.zeros(shape, dtype=ray_features.dtype, device=ray_features.device)
+#             .view((px_height * px_width), ray_features.shape[-1])
+#             .index_add(dim=0, index=points_screen_idx_linear, source=ray_features)
+#         )
+#         denom = (
+#             torch.zeros(shape, dtype=ray_features.dtype, device=ray_features.device)
+#             .view(px_height * px_width, ray_features.shape[-1])
+#             .index_add(dim=0, index=points_screen_idx_linear, source=torch.ones_like(ray_features))
+#         )
+#         return numer.div(denom).where(denom!=0, 0.).view(shape)

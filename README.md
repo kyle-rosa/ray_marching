@@ -46,12 +46,12 @@ $$\Phi: \bigcup_{n\in\mathbb{N}} (\mathbb{R}^3\to\mathbb{R})^n \to (\mathbb{R}^3
  
 ### SDF Primitives
 A collection of primitive SDFs for simple geometric shapes: 
-  1. spheres,
-  2. rectangular prisms,
-  3. planes, 
-  4. lines, 
-  5. disks, and
-  6. tori.
+  1. sphere,
+  2. rectangular prism,
+  3. plane, 
+  4. line, 
+  5. disk, and
+  6. torus.
 
 ### SDF Transformations
 Transformations that deform or modify individual SDFs: 
@@ -200,6 +200,31 @@ $$ \mathbb{S}^3\times\mathbb{S}^2 \to \mathbb{S}^3 \to \mathbb{S}^1 \to \mathbb{
 ## User Input and Camera Control
 We use Pynput to process mouse and keyboard inputs.
 
+<!-- ### Controls
+w forward
+
+a left
+
+s backward
+
+d right
+
+e up
+
+x down
+
+r rotate anticlockwise
+
+m 
+
+n
+
+i
+
+o -->
+
+
+### Input Processing
 The user can control the camera position and orientation, as well as the settings for a couple of rendering options. Each frame, we need to perform the following steps:
 1. Query the mouse and keyboard inputs.
 2. Map these to transformations in the parameters they control.
