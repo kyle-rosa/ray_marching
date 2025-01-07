@@ -179,7 +179,7 @@ This gives a vector $(\alpha, \beta)\in\mathbb{R}^2$, and it can be shown that $
 ### Spin Shader
 This shader colours each pixel based on the normal vector of the incident surface and the quaternion that defines the embedding of the camera and object in world space. The result mimics the behaviour of spin-$1/2$ objects in physics, as rotating the camera $360^\circ$ reverses the orientation of the texture on the surface.
 
-Let $N_p=(x, y, z)$ be the surface normal vector at pixel $p$, and $q$ be the quaternion encoding the embedding of the camera into space. We can idewntify $\mathbb{R}^3$ with the pure-imaginary quaternions, mapping $N_p$ to $0 + xi + yj + zk$, and then calculate  
+Let $N_p=(x, y, z)$ be the surface normal vector at pixel $p$, and $q$ be the quaternion encoding the embedding of the camera into space. We can identify $\mathbb{R}^3$ with the pure-imaginary quaternions, mapping $N_p$ to $0 + xi + yj + zk$, and then calculate  
 
 $$\overline{q} N_p = a + bi + cj + dk \in \mathbb{S}^3.$$ 
 
@@ -239,7 +239,7 @@ The advantage of working in the Lie algebra $\mathfrak{g}$ is that we can linear
 In our application, $X = G \cong \mathbb{R}^3 \rtimes \text{Spin}_3$ is the set of embeddings into 3D space, and the Lie algebra is $\mathfrak{g} \cong \mathbb{R}^3 \times \mathfrak{sl}_3$. 
 
 ### Display
-I've used the TorchWindow package [2] to display rendered frames without moving any data off the GPU. 
+I've used the TorchWindow package [2] to display rendered frames from the GPU. 
 
 
 # TODO

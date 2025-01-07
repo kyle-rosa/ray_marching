@@ -6,9 +6,6 @@ from torch import Tensor
 import quaternion as Q
 
 
-_default_dtype = torch.float32
-
-
 class PinholeCamera(nn.Module):
     def __init__(
         self,
@@ -32,15 +29,24 @@ class PinholeCamera(nn.Module):
         )
         self.register_buffer(
             'theta',
-            torch.tensor([[[sensor_width / 2, 0., 0.], [0., -sensor_height / 2, 0.]]]).expand(num_cameras, 2, 3)
+            torch.tensor(
+                [[
+                    [sensor_width / 2, 0., 0.],
+                    [0., -sensor_height / 2, 0.]
+                ]]
+            ).expand(num_cameras, 2, 3)
         )
         self.register_buffer(
             'ray_positions',
-            F.pad(F.affine_grid(theta=self.theta.float(), size=self.size, align_corners=False), pad=[0, 1], value=0.)
+            F.pad(F.affine_grid(
+                theta=self.theta.float(),
+                size=self.size,
+                align_corners=False
+            ), pad=[0, 1], value=0.)
         )
         self.register_buffer(
             'ray_directions',
-            F.normalize(self.ray_positions.sub(self.focus).cuda(), p=2, dim=-1, eps=0)
+            F.normalize(self.ray_positions.sub(self.focus), p=2, dim=-1, eps=0)
         )
         self.register_buffer(
             'pixel_frames',
@@ -49,39 +55,13 @@ class PinholeCamera(nn.Module):
         self.quaternion_to_so3 = Q.QuaternionToSO3()
 
     def forward(self, orientation: Tensor, translation: Tensor) -> Tensor:
-        ray_positions = Q.rotation(self.ray_positions, orientation).add(translation)
-        ray_directions = Q.rotation(self.ray_directions, orientation)
+        ray_positions = (
+            Q.rotation(self.ray_positions, orientation[:, None, None, :])
+            .add(translation[:, None, None, :])
+        )
+        ray_directions = Q.rotation(self.ray_directions, orientation[:, None, None, :])
         pixel_frames = self.quaternion_to_so3(orientation[:, None, None, :])
         return (ray_positions, pixel_frames, ray_positions, ray_directions)
-
-
-# class RayGenerator(nn.Module):
-#     def __init__(
-#             self,
-#             focal_length = 17e-3,
-#             sensor_width = 17e-3,
-#             sensor_height = 17e-3
-#         ):
-#         super().__init__()
-#         self.sensor_width = nn.Parameter(torch.tensor(sensor_width))
-#         self.sensor_height = nn.Parameter(torch.tensor(sensor_height))
-#         self.focal_length = nn.Parameter(torch.tensor(focal_length))
-#         self.quaternion_to_so3 = Q.QuaternionToSO3()
-    
-#     def forward(self, points_screen, orientation: Tensor, translation: Tensor) -> Tensor:
-#         points_space = torch.stack(
-#             [
-#                 points_screen[..., 0] * self.sensor_width,
-#                 points_screen[..., 1] * self.sensor_height,
-#                 self.focal_length.expand_as(points_screen[..., 0])
-#             ], dim=-1
-#         )
-#         ray_directions = torch.nn.functional.normalize(points_space, dim=-1, p=2)
-
-#         ray_positions = Q.rotation(points_space, orientation).add(translation)
-#         ray_directions = Q.rotation(ray_directions, orientation)
-#         pixel_frames = self.quaternion_to_so3(orientation[:, None, :])
-#         return (ray_positions, pixel_frames, ray_positions, ray_directions)
 
 
 class SDFMarcher(nn.Module):
@@ -90,22 +70,26 @@ class SDFMarcher(nn.Module):
         self.sdf_scene = sdf_scene
 
     def forward(
-            self,
-            ray_positions: Tensor,
-            ray_directions: Tensor,
-            marching_steps: int = 32
-        ) -> Tensor:
+        self,
+        ray_positions: Tensor,
+        ray_directions: Tensor,
+        marching_steps: int = 32
+    ) -> Tensor:
         for _ in range(marching_steps):
-            ray_positions = self.sdf_scene(ray_positions).mul(ray_directions).add(ray_positions)
+            ray_positions = (
+                self.sdf_scene(ray_positions)
+                .mul(ray_directions)
+                .add(ray_positions)
+            )
         return ray_positions
 
 
 class SDFNormals(nn.Module):
     def __init__(
-            self, 
-            sdf_scene: nn.Module,
-            normals_eps: float = 1e-3,
-        ):
+        self,
+        sdf_scene: nn.Module,
+        normals_eps: float = 1e-3,
+    ):
         super().__init__()
         self.sdf_scene = sdf_scene
         self.normals_eps = normals_eps
@@ -123,12 +107,12 @@ class SDFNormals(nn.Module):
         self.offsets = F.normalize(self.offsets, dim=-1, p=2, eps=0.)
         self.offsets = self.offsets.mul(self.normals_eps)
         self.register_buffer(
-            'relative_offsets', 
+            'relative_offsets',
             self.offsets[..., [1, 2, 3], :].sub(self.offsets[..., [0], :])
         )
         self.register_buffer('offsets_inverse', self.relative_offsets.inverse())
 
-    def forward(self, surface_coords):
+    def forward(self, surface_coords: Tensor) -> Tensor:
         offset_values = self.sdf_scene(surface_coords[..., None, :].add(self.offsets))
         d_values = offset_values[..., [1, 2, 3], :].sub(offset_values[..., [0], :])
         normals = self.offsets_inverse.mul(d_values[..., None, :, 0]).sum(dim=-1)

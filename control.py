@@ -17,10 +17,11 @@ from collections import defaultdict
 
 class EventAggregator(nn.Module):
     def __init__(
-            self, 
-            initial_position: list[tuple[float, float, float]] = [(0., 0., 0.)],
-            initial_orientation: list[tuple[float, float, float]] = [(1., 0., 0., 0.)],
-        ):
+        self,
+        initial_position: list[tuple[float, float, float]],
+        initial_orientation: list[tuple[float, float, float]],
+        marching_steps: int = 32,
+    ):
         super().__init__()
 
         self.register_buffer('position', torch.tensor(initial_position))
@@ -34,15 +35,15 @@ class EventAggregator(nn.Module):
         # Initialise state variables:
         self.mouse_state = self.screen_centre
         self.keyboard_state = defaultdict(bool)
-        self.mode = torch.tensor(0)
-        self.degree = torch.tensor(2)
-        self.marching_steps = 32
+        self.marching_steps = marching_steps
+        self.mode = 0
+        self.degree = 2
         self.save_frame = False
 
         # Define input events:
         def on_move(x, y):
             self.mouse_state = (x, y)
-        
+
         def on_click(x, y, button, pressed):
             pass
 
@@ -54,7 +55,7 @@ class EventAggregator(nn.Module):
 
         def on_press(key):
             self.keyboard_state[key] = True
-            if (type(key) == keyboard.KeyCode):
+            if isinstance(key, keyboard.KeyCode):
                 if key.char == 'q':
                     self.running = False
                 if key.char == 'i':
@@ -70,7 +71,7 @@ class EventAggregator(nn.Module):
 
         def on_release(key):
             self.keyboard_state[key] = False
-        
+
         self.running = True
         self.listeners = {
             'mouse': mouse.Listener(
@@ -91,30 +92,43 @@ class EventAggregator(nn.Module):
         self.controllers['mouse'].position = self.screen_centre
         self.register_buffer('ndc_mouse_diff', torch.tensor((0., 0.)))
 
-        self.kb_dict = pd.read_csv(Path() / 'data/keybindings.csv', header=0).set_index('key').T.to_dict()
+        self.kb_dict = (
+            pd.read_csv(Path('./data/key_bindings.csv'), header=0)
+            .set_index('key').T.to_dict()
+        )
         self.translations_mappings = nn.ParameterDict({
             key: nn.Parameter(
-                torch.tensor([self.kb_dict[key]['X'], self.kb_dict[key]['Y'], self.kb_dict[key]['Z']])
+                torch.tensor(
+                    [self.kb_dict[key][it] for it in "XYZ"])
             ) for key in self.kb_dict
         })
         self.orientations_mappings = nn.ParameterDict({
             key: nn.Parameter(
-                torch.tensor([self.kb_dict[key]['YZ'], self.kb_dict[key]['ZX'], self.kb_dict[key]['XY']])
+                torch.tensor([self.kb_dict[key][it] for it in ["YZ", "ZX", "XY"]])
             ) for key in self.kb_dict
         })
 
         self.register_buffer('default_position_input', torch.tensor([[0., 0., 0.]]))
         self.register_buffer('default_orientation_input', torch.tensor([[0., 0., 0.]]))
-        
 
     def get_state(self):
         # Get mouse offsets:
-        self.ndc_mouse_diff[0] = (self.mouse_state[0] - self.screen_centre[0]) / self.screen_centre[0]
-        self.ndc_mouse_diff[1] = (self.mouse_state[1] - self.screen_centre[1]) / self.screen_centre[1]
+        self.ndc_mouse_diff[0] = (
+            (self.mouse_state[0] - self.screen_centre[0])
+            / self.screen_centre[0]
+        )
+        self.ndc_mouse_diff[1] = (
+            (self.mouse_state[1] - self.screen_centre[1])
+            / self.screen_centre[1]
+        )
         # self.controllers['mouse'].position = self.screen_centre
 
         # Get key presses:
-        keys = [k.char for (k, v) in self.keyboard_state.items() if (v and (type(k)==keyboard.KeyCode))]
+        keys = [
+            k.char
+            for (k, v) in self.keyboard_state.items()
+            if (v and isinstance(k, keyboard.KeyCode))
+        ]
         key = (keys[0] if keys else None)
 
         # Convert mouse input to components:
@@ -126,21 +140,27 @@ class EventAggregator(nn.Module):
         keyboard_orientation_input = self.default_orientation_input.clone()
         for key in set(self.kb_dict).intersection(keys):
             keyboard_position_input += self.translations_mappings[key][None]
-            keyboard_orientation_input +=  self.orientations_mappings[key][None]
-        
+            keyboard_orientation_input += self.orientations_mappings[key][None]
+
         # Add mouse and keyboard effects together:
         translation_input = keyboard_position_input
         orientation_input = mouse_orientation_input.add(keyboard_orientation_input)
 
         # Apply updates to position and orientation parameters:
         self.position = Q.rotation(
-            translation_input.mul(self.translation_sensitivity).expand_as(self.position),
+            (
+                translation_input
+                .mul(self.translation_sensitivity)
+                .expand_as(self.position)
+            ),
             self.orientation
         ).add(self.position)
         self.orientation = F.normalize(
             Q.multiply(
                 self.orientation,
-                Q.to_versor(orientation_input.mul(self.rotation_sensitivity)).expand_as(self.orientation)
+                Q.to_versor(
+                    orientation_input.mul(self.rotation_sensitivity)
+                ).expand_as(self.orientation)
             ), p=2, dim=-1, eps=0
         )
 
@@ -154,36 +174,6 @@ class EventAggregator(nn.Module):
             self.marching_steps,
             save_frame
         )
-
-
-def aggregate_rays(
-        px_width,
-        px_height,
-        points_screen,
-        ray_features,
-    ):
-        shape = (px_height, px_width, ray_features.shape[-1])
-        points_screen_idx = torch.stack(
-            [ 
-                points_screen[..., 0].add(1).div(2).mul(px_width).trunc().long().clamp(0, px_width-1),
-                points_screen[..., 1].mul(-1).add(1).div(2).mul(px_height).trunc().long().clamp(0, px_height-1)
-            ], dim=-1
-        )
-        points_screen_idx_linear = (
-            points_screen_idx[..., 1] * px_width
-            + points_screen_idx[..., 0]
-        )
-        numer = (
-            torch.zeros(shape, dtype=ray_features.dtype, device=ray_features.device)
-            .view((px_height * px_width), ray_features.shape[-1])
-            .index_add(dim=0, index=points_screen_idx_linear, source=ray_features)
-        )
-        denom = (
-            torch.zeros(shape, dtype=ray_features.dtype, device=ray_features.device)
-            .view(px_height * px_width, ray_features.shape[-1])
-            .index_add(dim=0, index=points_screen_idx_linear, source=torch.ones_like(ray_features))
-        )
-        return numer.div(denom).where(denom!=0, 0.).view(shape)
 
 
 def make_reflection_directions(
@@ -236,63 +226,33 @@ class RenderLoop(nn.Module):
             sdf_scene=self.scene,
             normals_eps=normals_eps,
         )
-        self.shader = Shader(
-            cyclic_cmap=torch.load(Path() / 'data/cyclic_cmap.pt'),
-        )
+        self.shader = Shader()
 
     def forward(
         self,
         orientations: Tensor,
         translations: Tensor,
+        mode: int = 0,
         degree: int = 1,
         marching_steps: int = 32,
-        legs: int = 2
     ):
-        (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(orientations, translations)
-        
-        modes = [
-            'lambertian', 'distance', 'proximity',
-            'vignette', 'normal', 'laplacian',
-            'tangent', 'spin'
-        ]
-        images = {k: torch.zeros_like(ray_pos) for k in modes}
-
-
-        ray_positions = []
-        ray_directions = []
-        cum_leg_length = torch.zeros_like(ray_pos[..., [0]])
-        for leg in range(legs):
-            ray_positions.append(ray_pos.clone())
-            ray_directions.append(ray_dirs.clone())
-            ray_pos = ray_pos + 0.1 * ray_dirs
-
-            marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
-            surface_distances = self.scene(marched_ray_pos)
-            (surface_normals, surface_laplacian) = self.normals(marched_ray_pos)
-            
-            new_images = dict(zip(
-                modes, 
-                self.shader(
-                    pixel_pos, orientations, pixel_frames, 
-                    ray_dirs, marched_ray_pos, 
-                    surface_normals, surface_laplacian,
-                    surface_distances, degree=degree
-                )
-            ))
-            # leg_length = (marched_ray_pos - ray_pos).pow(2).sum(dim=-1, keepdim=True).pow(1/2)
-            # cum_leg_length = cum_leg_length + leg_length
-            for key in new_images:
-                images[key] += new_images[key] #* cum_leg_length.pow(-2)
-
-            reflected_dirs = make_reflection_directions(surface_normals, ray_dirs)
-
-
-            ray_pos = marched_ray_pos
-            ray_dirs = reflected_dirs
-
-
-
-        for key in images:
-            images[key] = (images[key] / legs).expand(1, -1, -1, 3)
-        
-        return images
+        (pixel_pos, pixel_frames, ray_pos, ray_dirs) = self.camera(
+            orientation=orientations,
+            translation=translations
+        )
+        marched_ray_pos = self.marcher(ray_pos, ray_dirs, marching_steps)
+        surface_distances = self.scene(marched_ray_pos)
+        (surface_normals, surface_laplacian) = self.normals(marched_ray_pos)
+        image = self.shader(
+            pixel_pos,
+            orientations,
+            pixel_frames,
+            ray_dirs,
+            marched_ray_pos,
+            surface_normals,
+            surface_laplacian,
+            surface_distances,
+            mode=mode,
+            degree=degree,
+        ).expand(-1, self.px_height, self.px_width, 3)
+        return image

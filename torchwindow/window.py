@@ -23,10 +23,10 @@ class Window:
     To create a window:
         from torchwindow import Window
         window = Window(640, 480, name="Torch Window")
-    
+
     To display an image tensor in the window:
         window.draw(image)
-    
+
     `image` must be a tensor with the following properties:
         - 3 dimensions, specifically `(rows, columns, channels)` in that order.
         - `channels` dimension must be of size 4 (r, g, b, a)

@@ -7,16 +7,17 @@ import quaternion as Q
 
 class SDFAffineTransformation(nn.Module):
     """
-    Given an SDF and an affine transformation, returns a new SDF for the transformed geometry.
-    This is done by applying the inverse transformation to the queries, then evaluating the original SDF.
+    Given an SDF and an affine transformation, returns a new SDF for the transformed
+    geometry. This is done by applying the inverse transformation to the queries, then
+    evaluating the original SDF.
 
     Args:
-        sdf (nn.Module): A callable that takes a 3D tensor of query positions as input and
-                         returns a tensor of signed distances.
-        orientation (list, tuple or numpy.ndarray): A quaternion that specifies the rotation of the
-                                                    input positions.
-        translation (list, tuple or numpy.ndarray): A 3-element vector that specifies the translation
-                                                    of the input positions.
+        sdf (nn.Module): A callable that takes a 3D tensor of query positions as input
+        and returns a tensor of signed distances.
+        orientation (list, tuple or numpy.ndarray): A quaternion that specifies the
+        rotation of the input positions.
+        translation (list, tuple or numpy.ndarray): A 3-element vector that specifies
+        the translation of the input positions.
     """
     def __init__(
         self,
@@ -32,8 +33,11 @@ class SDFAffineTransformation(nn.Module):
     def forward(self, query_positions: Tensor) -> Tensor:
         return self.sdf(
             Q.rotation(
-                query_positions.sub(self.translation), 
-                Q.conjugate(self.orientation)
+                (
+                    query_positions
+                    .sub(self.translation.expand(*query_positions.shape[:-1], 3))
+                ),
+                Q.conjugate(self.orientation).expand(*query_positions.shape[:-1], 4)
             )
         )
 
@@ -43,10 +47,10 @@ class SDFSmoothUnion(nn.Module):
     Smooth union of multiple SDFs (signed distance functions).
 
     Args:
-        sdfs (list of nn.Module): A list of callables that take a 3D tensor of query positions as input
-                                  and return a tensor of signed distances.
-        blend_k (float): A positive value that controls the smoothness of the union operation. 
-                         Higher values result in a smoother union.
+        sdfs (list of nn.Module): A list of callables that take a 3D tensor of query
+        positions as input and return a tensor of signed distances.
+        blend_k (float): A positive value that controls the smoothness of the union
+        operation. Higher values result in a smoother union.
 
     Returns:
         A tensor of signed distances representing the smooth union of the input SDFs.
@@ -70,11 +74,9 @@ class SDFSmoothUnion(nn.Module):
 class SDFUnion(nn.Module):
     """
     Union of multiple SDFs (signed distance functions).
-
     Args:
-        sdfs (list of nn.Module): A list of callables that take a 3D tensor of query positions as input
-                                  and return a tensor of signed distances.
-
+        sdfs (list of nn.Module): A list of callables that take a 3D tensor of query
+        positions as input and return a tensor of signed distances.
     Returns:
         A tensor of signed distances representing the union of the input SDFs.
     """
@@ -85,22 +87,21 @@ class SDFUnion(nn.Module):
         super().__init__()
         self.sdfs = nn.ModuleList(sdfs)
 
-    def forward(self,query_coords: Tensor) -> Tensor:
+    def forward(self, query_coords: Tensor) -> Tensor:
         return (
             torch.stack([sdf(query_coords) for sdf in self.sdfs], dim=-2)
             .min(dim=-2).values
         )
 
-    
+
 class SDFRounding(nn.Module):
     """
     Rounding operation of an SDF (signed distance function) defined over 3D space.
 
     Args:
-        sdf (nn.Module): A callable that takes a 3D tensor of query positions as input and
-                         returns a tensor of signed distances.
+        sdf (nn.Module): A callable that takes a 3D tensor of query positions as input
+        and returns a tensor of signed distances.
         rounding (float): The distance at which to perform the rounding.
-
     Returns:
         A tensor of signed distances after the rounding operation has been applied.
     """
@@ -121,31 +122,11 @@ class SDFOnion(nn.Module):
     def __init__(
         self,
         sdf: nn.Module,
-        radii: float,
+        radius: float,
     ):
         super().__init__()
         self.sdf = sdf
-        self.radii = nn.Parameter(torch.tensor(radii))
+        self.radius = nn.Parameter(torch.tensor(radius))
 
     def forward(self, query_coords: Tensor) -> Tensor:
-        return self.sdf(query_coords).abs().sub(self.radii)
-
-
-# class SDFCubicRepitition(nn.Module):
-#     def __init__(
-#         self,
-#         sdf: nn.Module,
-#         radii: float,
-#         dtype
-#     ):
-#         super().__init__()
-#         self.sdf = sdf
-#         # self.register_buffer('radii',  torch.tensor(radii))
-#         self.radii = nn.Parameter(torch.tensor(radii, dtype=dtype))
-
-#     def forward(
-#         self,
-#         query_coords: Tensor
-#     ) -> Tensor:
-        
-#         return self.sdf(query_coords)
+        return self.sdf(query_coords).abs().sub(self.radius)
