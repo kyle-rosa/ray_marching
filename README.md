@@ -262,12 +262,9 @@ I've used the TorchWindow package [2] to display rendered frames from the GPU.
     2. Implement ``cyclindical'' movement system with fixed up direction.
     3. Hide mouse cursor.
 5. Speed optimisations:
-    1. Support for half precision computations. 
-        1. I've played with this but it required introducing a new "dtype" keyword that runs through all the classes. I think there's got to be a better approach.
-        2. Rendering in half precision causes graphical artifacts on some SDFs, need to investigate how to improve this.
-    2. Some kind of bounding box hierarchy implementation?
-    3. Add PyTorch profiling script.
-    4. Test speed of different implementations of inverse affine transformations.
+    1. Some kind of bounding box hierarchy implementation?
+    2. Add PyTorch profiling script.
+    3. Test speed of different implementations of inverse affine transformations.
 
 
 ## References
